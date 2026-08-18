@@ -17,7 +17,7 @@ Energy Dashboard.
 
 ## Installation
 
-1. Add this repository to HACS (Custom repositories → `https://github.com/jocelyngirard/sogedo-ha` → Integration) and install.
+1. Add this repository to HACS (Custom repositories → `https://github.com/girard-xyz/sogedo-ha` → Integration) and install.
 2. Restart Home Assistant.
 3. Add the **Sogedo Water** integration via Settings → Devices & Services.
 4. Follow the authorization flow: click the link, log in to Sogedo, copy the
