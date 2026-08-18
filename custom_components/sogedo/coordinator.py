@@ -6,6 +6,7 @@ import logging
 from datetime import datetime, timedelta
 
 from homeassistant.core import HomeAssistant
+from homeassistant.util import dt as dt_util
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import BACKFILL_DAYS, DOMAIN, SCAN_INTERVAL_SECONDS, UPDATE_DATE_OFFSET
@@ -34,7 +35,7 @@ class SogedoCoordinator(DataUpdateCoordinator[dict]):
         self._backfilled = False
 
     async def _async_update_data(self) -> dict:
-        today = datetime.now(self.hass.config.time_zone).date()
+        today = dt_util.now().date()
         start = today - timedelta(days=UPDATE_DATE_OFFSET)
         end = today
 
