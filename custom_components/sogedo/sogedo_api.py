@@ -15,6 +15,7 @@ import logging
 import os
 import time
 from typing import Any
+from urllib.parse import urlencode
 
 import requests
 
@@ -61,8 +62,7 @@ def build_authorize_url(code_challenge: str, state: str) -> str:
         "code_challenge_method": "S256",
         "state": state,
     }
-    query = "&".join(f"{k}={v}" for k, v in params.items())
-    return f"{AUTHORIZE_ENDPOINT}?{query}"
+    return f"{AUTHORIZE_ENDPOINT}?{urlencode(params)}"
 
 
 def exchange_code(code: str, code_verifier: str) -> dict[str, Any]:
