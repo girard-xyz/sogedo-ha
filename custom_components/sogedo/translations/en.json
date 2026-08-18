@@ -3,7 +3,7 @@
     "step": {
       "authorize": {
         "title": "Authorize Sogedo",
-        "description": "Open the link below and log in to your Sogedo account. After logging in you will be redirected to a page whose URL contains `code=...`. Copy the value after `code=` and continue.",
+        "description": "Click [here]({authorize_url}) to open the Sogedo authorization page. Log in, then copy the value of `code=` from the redirect URL and continue.",
         "data": {
           "authorize_url": "Authorization URL"
         }

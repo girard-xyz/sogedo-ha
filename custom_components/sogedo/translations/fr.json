@@ -3,7 +3,7 @@
     "step": {
       "authorize": {
         "title": "Autoriser Sogedo",
-        "description": "Ouvrez le lien ci-dessous et connectez-vous à votre compte Sogedo. Après connexion, vous serez redirigé vers une page dont l'URL contient `code=...`. Copiez la valeur après `code=` et continuez.",
+        "description": "Cliquez [ici]({authorize_url}) pour ouvrir la page d'autorisation Sogedo. Connectez-vous, puis copiez la valeur de `code=` dans l'URL de redirection et continuez.",
         "data": {
           "authorize_url": "URL d'autorisation"
         }
