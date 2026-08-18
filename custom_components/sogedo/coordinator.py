@@ -87,31 +87,30 @@ class SogedoCoordinator(DataUpdateCoordinator[dict]):
             if not valid:
                 return
 
-            from homeassistant.components.recorder.models import (
-                StatisticData,
-                StatisticMetaData,
-                StatisticMeanType,
-            )
             from homeassistant.components.recorder.statistics import (
                 async_add_external_statistics,
             )
 
             # The cumulative sensor feeds the Energy Dashboard, so backfill it
-            # with the historical meter index (total_increasing sum).
-            meta = StatisticMetaData(
-                has_sum=True,
-                mean_type=StatisticMeanType.NONE,
-                name="Sogedo water",
-                source="sensor",
-                statistic_id="sensor.sogedo_water_cumulative",
-                unit_class="volume",
-                unit_of_measurement="m³",
-            )
+            # with the historical meter index (total_increasing sum). Plain
+            # dicts are used so no recorder model imports are required.
+            meta = {
+                "has_mean": False,
+                "mean_type": 0,  # StatisticMeanType.NONE
+                "has_sum": True,
+                "name": "Sogedo water",
+                "source": "sensor",
+                "statistic_id": "sensor.sogedo_water_cumulative",
+                "unit_class": "volume",
+                "unit_of_measurement": "m³",
+            }
             stats = [
-                StatisticData(
-                    start=datetime.fromisoformat(e["indexDate"].replace("Z", "+00:00")),
-                    sum=e["indexValue"],
-                )
+                {
+                    "start": datetime.fromisoformat(
+                        e["indexDate"].replace("Z", "+00:00")
+                    ),
+                    "sum": e["indexValue"],
+                }
                 for e in valid
             ]
             await async_add_external_statistics(self.hass, meta, stats)
