@@ -92,19 +92,22 @@ class SogedoCoordinator(DataUpdateCoordinator[dict]):
         if not valid:
             return
 
-        meta = StatisticMetaData(
-            has_mean=False,
-            has_sum=True,
-            name="Sogedo water daily",
-            source=DOMAIN,
-            statistic_id=f"{DOMAIN}_water_daily",
-            unit_of_measurement="m³",
-        )
-        stats = [
-            StatisticData(
-                start=datetime.fromisoformat(e["indexDate"].replace("Z", "+00:00")),
-                sum=e["consumptionValue"],
+        try:
+            meta = StatisticMetaData(
+                has_mean=False,
+                has_sum=True,
+                name="Sogedo water daily",
+                source=DOMAIN,
+                statistic_id="sensor.sogedo_water_daily",
+                unit_of_measurement="m³",
             )
-            for e in valid
-        ]
-        await async_add_external_statistics(self.hass, meta, stats)
+            stats = [
+                StatisticData(
+                    start=datetime.fromisoformat(e["indexDate"].replace("Z", "+00:00")),
+                    sum=e["consumptionValue"],
+                )
+                for e in valid
+            ]
+            await async_add_external_statistics(self.hass, meta, stats)
+        except Exception:  # noqa: BLE001
+            _LOGGER.warning("Sogedo backfill failed; skipping", exc_info=True)
