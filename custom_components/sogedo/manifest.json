@@ -1,0 +1,11 @@
+{
+  "domain": "sogedo",
+  "name": "Sogedo Water",
+  "codeowners": ["@jocelyngirard"],
+  "config_flow": true,
+  "documentation": "https://github.com/jocelyngirard/sogedo-ha",
+  "issue_tracker": "https://github.com/jocelyngirard/sogedo-ha/issues",
+  "iot_class": "cloud_polling",
+  "requirements": [],
+  "version": "0.1.0"
+}

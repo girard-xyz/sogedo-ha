@@ -1,0 +1,44 @@
+{
+  "config": {
+    "step": {
+      "authorize": {
+        "title": "Autoriser Sogedo",
+        "description": "Ouvrez le lien ci-dessous et connectez-vous à votre compte Sogedo. Après connexion, vous serez redirigé vers une page dont l'URL contient `code=...`. Copiez la valeur après `code=` et continuez.",
+        "data": {
+          "authorize_url": "URL d'autorisation"
+        }
+      },
+      "token": {
+        "title": "Code d'autorisation",
+        "description": "Collez ici la valeur `code` de l'URL de redirection.",
+        "data": {
+          "code": "Code d'autorisation"
+        }
+      },
+      "subscription": {
+        "title": "Abonnement",
+        "description": "Sélectionnez l'abonnement d'eau à surveiller.",
+        "data": {
+          "subscription": "Abonnement"
+        }
+      }
+    },
+    "error": {
+      "invalid_code": "Le code d'autorisation est invalide ou expiré. Réessayez.",
+      "unknown": "Une erreur inattendue s'est produite."
+    },
+    "abort": {
+      "already_configured": "Ce compte Sogedo est déjà configuré."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "daily_consumption": {
+        "name": "Consommation journalière"
+      },
+      "cumulative": {
+        "name": "Consommation cumulée"
+      }
+    }
+  }
+}

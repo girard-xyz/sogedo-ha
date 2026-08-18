@@ -1,0 +1,40 @@
+{
+  "config": {
+    "step": {
+      "authorize": {
+        "title": "Authorize Sogedo",
+        "description": "Open the link below and log in to your Sogedo account. After logging in you will be redirected to a page whose URL contains `code=...`. Copy the value after `code=` and continue.",
+        "data": {
+          "authorize_url": "Authorization URL"
+        }
+      },
+      "token": {
+        "title": "Authorization code",
+        "description": "Paste the `code` value from the redirect URL here.",
+        "data": {
+          "code": "Authorization code"
+        }
+      },
+      "subscription": {
+        "title": "Subscription",
+        "description": "Select the water subscription to monitor.",
+        "data": {
+          "subscription": "Subscription"
+        }
+      }
+    },
+    "error": {
+      "invalid_code": "The authorization code is invalid or expired. Try again.",
+      "unknown": "An unexpected error occurred."
+    },
+    "abort": {
+      "already_configured": "This Sogedo account is already configured."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "daily_consumption": { "name": "Daily consumption" },
+      "cumulative": { "name": "Cumulative consumption" }
+    }
+  }
+}
