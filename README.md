@@ -11,8 +11,6 @@ Energy Dashboard.
 - **Cumulative consumption** sensor (`sensor.sogedo_water_cumulative`) — total
   meter index, `total_increasing`. Connect this one to the Energy Dashboard's
   **mains water** source.
-- Backfills up to 365 days of history on first setup so the Energy Dashboard
-  shows prior consumption.
 - Updates every 6 hours (Sogedo publishes data daily).
 
 ## Installation
