@@ -108,19 +108,24 @@ class SogedoCoordinator(DataUpdateCoordinator[dict]):
                 return
 
             from homeassistant.components.recorder.statistics import (
-                async_add_external_statistics,
+                async_import_statistics,
+            )
+            from homeassistant.helpers.entity_registry import (
+                async_get as async_get_entity_registry,
             )
 
-            # The cumulative sensor feeds the Energy Dashboard, so backfill it
-            # with the historical meter index (total_increasing sum). Plain
-            # dicts are used so no recorder model imports are required.
+            # The cumulative sensor feeds the Energy Dashboard. HA reads the
+            # sensor's own (dot-form) statistic_id, so use the real entity_id
+            # via the recorder's internal import path (source "recorder") to
+            # merge the backfill with the live statistics.
+            statistic_id = self._cumulative_entity_id()
             meta = {
                 "has_mean": False,
                 "mean_type": 0,  # StatisticMeanType.NONE
                 "has_sum": True,
                 "name": "Sogedo water",
-                "source": "sensor",
-                "statistic_id": "sensor.sogedo_water_cumulative",
+                "source": "recorder",
+                "statistic_id": statistic_id,
                 "unit_class": "volume",
                 "unit_of_measurement": "m³",
             }
@@ -133,7 +138,20 @@ class SogedoCoordinator(DataUpdateCoordinator[dict]):
                 }
                 for e in valid
             ]
-            await async_add_external_statistics(self.hass, meta, stats)
+            await async_import_statistics(self.hass, meta, stats)
             _LOGGER.info("Sogedo backfilled %s days of water history", len(stats))
         except Exception:  # noqa: BLE001
             _LOGGER.warning("Sogedo backfill failed; skipping", exc_info=True)
+
+    def _cumulative_entity_id(self) -> str:
+        """Entity id of the cumulative sensor, localized via the registry."""
+        registry = async_get_entity_registry(self.hass)
+        entity = next(
+            (
+                e
+                for e in registry.entities.values()
+                if e.platform == "sogedo" and e.unique_id.endswith("_cumulative")
+            ),
+            None,
+        )
+        return entity.entity_id if entity else "sensor.sogedo_water_cumulative"
