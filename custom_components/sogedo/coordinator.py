@@ -136,7 +136,7 @@ class SogedoCoordinator(DataUpdateCoordinator[dict]):
                 }
                 for e in valid
             ]
-            await async_import_statistics(self.hass, meta, stats)
+            async_import_statistics(self.hass, meta, stats)
             _LOGGER.info("Sogedo backfilled %s days of water history", len(stats))
         except Exception:  # noqa: BLE001
             _LOGGER.warning("Sogedo backfill failed; skipping", exc_info=True)
