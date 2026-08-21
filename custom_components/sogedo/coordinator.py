@@ -73,6 +73,10 @@ class SogedoCoordinator(DataUpdateCoordinator[dict]):
 
         return data
 
+    async def async_refresh_history(self) -> None:
+        """Re-run the backfill on demand (idempotent upsert)."""
+        await self._backfill(dt_util.now().date())
+
     async def _backfill(self, end_date: datetime.date) -> None:
         """Best-effort backfill of water history into the recorder.
 

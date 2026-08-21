@@ -3,7 +3,7 @@
 from homeassistant.const import Platform
 
 DOMAIN = "sogedo"
-PLATFORMS = [Platform.SENSOR]
+PLATFORMS = [Platform.BUTTON, Platform.SENSOR]
 
 # Config entry keys
 CONF_REFRESH_TOKEN = "refresh_token"

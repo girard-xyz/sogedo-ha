@@ -39,6 +39,11 @@
       "cumulative": {
         "name": "Consommation cumulée"
       }
+    },
+    "button": {
+      "refresh_history": {
+        "name": "Actualiser l'historique"
+      }
     }
   }
 }
