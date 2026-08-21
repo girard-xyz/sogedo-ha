@@ -9,11 +9,16 @@ Energy Dashboard.
 - **Daily consumption** sensor (`sensor.sogedo_water_daily`) — water used on the
   most recent completed day (J-1), in m³.
 - **Cumulative consumption** sensor (`sensor.sogedo_water_cumulative`) — total
-  meter index, `total_increasing`. Connect this one to the Energy Dashboard's
-  **mains water** source.
-- Backfills the last 365 days of water history into the recorder on first setup
-  (best-effort; a failure never breaks the integration).
+  meter index, `total_increasing`.
+- **Water history** (`sensor.sogedo_water_consumption`) — a statistics-only
+  history series backfilled with your full consumption history. Connect this
+  one to the Energy Dashboard's **mains water** source.
+- **Refresh history** button (`button.sogedo_actualiser_l_historique`) — re-run
+  the backfill on demand (idempotent, safe to press any time).
+- Backfills your full water history on first setup (best-effort; a failure
+  never breaks the integration).
 - Updates every 6 hours (Sogedo publishes data daily).
+- Auto-triggers an in-place re-auth if the token expires (entities preserved).
 
 ## Installation
 
@@ -26,7 +31,12 @@ Energy Dashboard.
 ## Energy Dashboard
 
 Settings → Energy → Water sources → **mains water** → select
-`sensor.sogedo_water_cumulative`.
+`sensor.sogedo_water_consumption`.
+
+The backfill writes a running cumulative of the daily consumption as the
+statistics `sum`, so the Energy Dashboard shows one coherent consumption value
+per day. To re-run the backfill (e.g. after a long outage), press the
+**Actualiser l'historique** button.
 
 ## Notes
 
