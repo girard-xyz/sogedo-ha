@@ -13,10 +13,12 @@ from .sogedo_api import SogedoClient
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     client = SogedoClient(entry.data[CONF_REFRESH_TOKEN])
     coordinator = SogedoCoordinator(
-        hass, client, entry.data[CONF_SUBSCRIPTION_ID]
+        hass, client, entry.data[CONF_SUBSCRIPTION_ID], entry
     )
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
 
+    # If auth is already expired, this raises ConfigEntryAuthFailed, which HA
+    # turns into an automatic reauth prompt (no need to delete the entry).
     await coordinator.async_config_entry_first_refresh()
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)

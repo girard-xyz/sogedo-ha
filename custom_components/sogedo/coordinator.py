@@ -5,12 +5,13 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timedelta
 
+from homeassistant.config_entries import ConfigEntry, ConfigEntryAuthFailed
 from homeassistant.core import HomeAssistant
 from homeassistant.util import dt as dt_util
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import BACKFILL_DAYS, SCAN_INTERVAL_SECONDS, UPDATE_DATE_OFFSET
-from .sogedo_api import SogedoClient, select_latest
+from .sogedo_api import SogedoAuthError, SogedoClient, select_latest
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -23,12 +24,14 @@ class SogedoCoordinator(DataUpdateCoordinator[dict]):
         hass: HomeAssistant,
         client: SogedoClient,
         subscription_id: str,
+        entry: ConfigEntry,
     ) -> None:
         super().__init__(
             hass,
             _LOGGER,
             name="Sogedo consumption",
             update_interval=timedelta(seconds=SCAN_INTERVAL_SECONDS),
+            config_entry=entry,
         )
         self.client = client
         self.subscription_id = subscription_id
@@ -46,6 +49,11 @@ class SogedoCoordinator(DataUpdateCoordinator[dict]):
                 start.isoformat(),
                 end.isoformat(),
             )
+        except SogedoAuthError as err:
+            # Raises ConfigEntryAuthFailed so HA auto-triggers an in-place
+            # reauth (entities are preserved). Reauth is handled by the
+            # config flow's async_step_reauth.
+            raise ConfigEntryAuthFailed(f"Sogedo auth failed: {err}") from err
         except Exception as err:
             raise UpdateFailed(f"Sogedo update failed: {err}") from err
 

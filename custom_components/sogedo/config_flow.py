@@ -102,6 +102,8 @@ class SogedoConfigFlow(ConfigFlow, domain=DOMAIN):
                 errors["base"] = "unknown"
 
             if not errors:
+                if self.source == config_entries.SOURCE_REAUTH:
+                    return self._update_existing_entry()
                 if len(self._subscriptions) == 1:
                     return self._create_entry(self._subscriptions[0])
                 return await self.async_step_subscription()
@@ -140,6 +142,13 @@ class SogedoConfigFlow(ConfigFlow, domain=DOMAIN):
         }
         title = sub.get("address") or "Sogedo"
         return self.async_create_entry(title=title, data=data)
+
+    def _update_existing_entry(self) -> ConfigFlowResult:
+        """Update the existing entry with a fresh token (entities preserved)."""
+        entry = self._get_reauth_entry()
+        data = dict(entry.data)
+        data[CONF_REFRESH_TOKEN] = self._refresh_token
+        return self.async_update_reload_and_abort(entry, data=data)
 
     async def async_step_reauth(
         self, user_input: dict[str, Any] | None = None
