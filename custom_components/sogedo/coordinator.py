@@ -103,7 +103,9 @@ class SogedoCoordinator(DataUpdateCoordinator[dict]):
             valid = [
                 e
                 for e in entries
-                if e.get("isIndexValueAvailable") and e.get("indexValue") is not None
+                if e.get("isIndexValueAvailable")
+                and e.get("indexValue") is not None
+                and e.get("consumptionValue") is not None
             ]
             if not valid:
                 return
@@ -116,6 +118,11 @@ class SogedoCoordinator(DataUpdateCoordinator[dict]):
             # sensor's own (dot-form) statistic_id, so use the real entity_id
             # via the recorder's internal import path (source "recorder") to
             # merge the backfill with the live statistics.
+            #
+            # Statistics for a total_increasing sensor store `state` as the
+            # cumulative meter index and `sum` as the per-period usage, which
+            # is what the Energy Dashboard reads. Writing the cumulative into
+            # `sum` produced ~-144 m³ at the backfill/live boundary.
             statistic_id = self._cumulative_entity_id()
             meta = {
                 "has_mean": False,
@@ -132,7 +139,8 @@ class SogedoCoordinator(DataUpdateCoordinator[dict]):
                     "start": datetime.fromisoformat(
                         e["indexDate"].replace("Z", "+00:00")
                     ),
-                    "sum": e["indexValue"],
+                    "state": e["indexValue"],
+                    "sum": e["consumptionValue"],
                 }
                 for e in valid
             ]
