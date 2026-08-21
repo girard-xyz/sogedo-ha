@@ -48,8 +48,9 @@ Reads your daily water consumption from [mon-compte.sogedo.fr](https://mon-compt
 
 1. **Settings → Energy → Water sources → Add** (or edit the existing one).
 2. **Mains water** → select `sensor.sogedo_water_consumption`.
-3. Set the **Coût (cost)** statistic → `sensor.sogedo_water_cost`.
-4. Set the **price** (€/m³) for the source.
+3. Set the **price** (€/m³) for the source.
+
+The **Coût** statistic is set automatically to `sensor.sogedo_water_cost` by the integration the first time the backfill runs.
 
 The backfill writes running cumulatives of the daily consumption and cost, so every day shows its real consumption and cost — including backfilled history. The water price is read from your Energy Dashboard water source config at backfill time. After changing the price, press the **Actualiser l'historique** button to recompute the cost history.
 
@@ -108,8 +109,9 @@ Sogedo uses Azure AD B2C and disables device-code and username/password (ROPC) f
 
 1. **Paramètres → Énergie → Sources d'eau → Ajouter** (ou modifier).
 2. **Eau du réseau** → sélectionner `sensor.sogedo_water_consumption`.
-3. Renseigner la statistique **Coût** → `sensor.sogedo_water_cost`.
-4. Renseigner le **prix** (€/m³) de la source.
+3. Renseigner le **prix** (€/m³) de la source.
+
+La statistique **Coût** est renseignée automatiquement sur `sensor.sogedo_water_cost` par l'intégration au premier rétro-remplissage.
 
 Le rétro-remplissage écrit des cumuls de consommation et de coût, si bien que chaque jour affiche sa consommation et son coût réels — y compris l'historique. Le prix est lu depuis votre configuration Énergie au moment du rétro-remplissage. Après un changement de prix, appuyez sur **Actualiser l'historique** pour recalculer le coût.
 

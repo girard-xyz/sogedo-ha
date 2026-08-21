@@ -201,6 +201,7 @@ class SogedoCoordinator(DataUpdateCoordinator[dict]):
             self._write_statistics(cons_stats, HISTORY_STATISTIC_ID, "volume", "m³")
             if cost_stats:
                 self._write_statistics(cost_stats, COST_STATISTIC_ID, None, "EUR")
+                await self._ensure_cost_stat()
 
             self._history_sum = cons_total
             self._history_cost_sum = cost_total
@@ -208,6 +209,30 @@ class SogedoCoordinator(DataUpdateCoordinator[dict]):
             _LOGGER.info("Sogedo backfilled %s days of water history", len(days))
         except Exception:  # noqa: BLE001
             _LOGGER.warning("Sogedo backfill failed; skipping", exc_info=True)
+
+    async def _ensure_cost_stat(self) -> None:
+        """Point the Energy Dashboard water source's Coût at the cost statistic."""
+        try:
+            from homeassistant.components.energy.data import async_get_manager
+
+            manager = await async_get_manager(self.hass)
+            if manager.data is None:
+                return
+            sources = list(manager.data.get("energy_sources", []))
+            changed = False
+            for i, source in enumerate(sources):
+                if (
+                    source.get("type") == "water"
+                    and source.get("stat_energy_from") == HISTORY_STATISTIC_ID
+                    and not source.get("stat_cost")
+                ):
+                    sources[i] = {**source, "stat_cost": COST_STATISTIC_ID}
+                    changed = True
+            if changed:
+                await manager.async_update({"energy_sources": sources})
+                _LOGGER.info("Sogedo water source Coût set to %s", COST_STATISTIC_ID)
+        except Exception:  # noqa: BLE001
+            _LOGGER.debug("Could not set the energy cost statistic", exc_info=True)
 
     async def _append_recent(self, today: datetime.date) -> None:
         """Extend the history statistics with any new days since the last run."""
