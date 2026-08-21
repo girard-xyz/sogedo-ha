@@ -13,6 +13,9 @@ Energy Dashboard.
 - **Water history** (`sensor.sogedo_water_consumption`) — a statistics-only
   history series backfilled with your full consumption history. Connect this
   one to the Energy Dashboard's **mains water** source.
+- **Water cost history** (`sensor.sogedo_water_cost`) — a statistics-only cost
+  series (consumption × your Energy Dashboard water price, read automatically
+  at backfill time). Set it as the water source's **Coût** (`stat_cost`).
 - **Refresh history** button (`button.sogedo_actualiser_l_historique`) — re-run
   the backfill on demand (idempotent, safe to press any time).
 - Backfills your full water history on first setup (best-effort; a failure
@@ -31,12 +34,15 @@ Energy Dashboard.
 ## Energy Dashboard
 
 Settings → Energy → Water sources → **mains water** → select
-`sensor.sogedo_water_consumption`.
+`sensor.sogedo_water_consumption`, and set the **Coût** statistic to
+`sensor.sogedo_water_cost`.
 
-The backfill writes a running cumulative of the daily consumption as the
-statistics `sum`, so the Energy Dashboard shows one coherent consumption value
-per day. To re-run the backfill (e.g. after a long outage), press the
-**Actualiser l'historique** button.
+The backfill writes running cumulatives of the daily consumption and cost as
+statistics `sum`, so the Energy Dashboard shows one coherent consumption (and
+cost) value per day — including backfilled history. The water price is read
+from your Energy Dashboard water source config (`number_energy_price`) at
+backfill time. To re-run the backfill (e.g. after changing the price), press
+the **Actualiser l'historique** button.
 
 ## Notes
 
