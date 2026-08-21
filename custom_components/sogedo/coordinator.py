@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 
 from homeassistant.config_entries import ConfigEntry, ConfigEntryAuthFailed
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.entity_registry import async_get as async_get_entity_registry
 from homeassistant.util import dt as dt_util
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
@@ -109,9 +110,6 @@ class SogedoCoordinator(DataUpdateCoordinator[dict]):
 
             from homeassistant.components.recorder.statistics import (
                 async_import_statistics,
-            )
-            from homeassistant.helpers.entity_registry import (
-                async_get as async_get_entity_registry,
             )
 
             # The cumulative sensor feeds the Energy Dashboard. HA reads the
