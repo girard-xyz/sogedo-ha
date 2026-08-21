@@ -76,16 +76,24 @@ class SogedoCoordinator(DataUpdateCoordinator[dict]):
     async def _backfill(self, end_date: datetime.date) -> None:
         """Best-effort backfill of water history into the recorder.
 
-        Never raises: a failure here must not fail the integration setup.
+        Fetches in one-year chunks so the full history is pulled regardless of
+        any API range limit. Never raises: a failure here must not fail setup.
         """
         try:
             start = end_date - timedelta(days=BACKFILL_DAYS)
-            entries = await self.hass.async_add_executor_job(
-                self.client.get_daily_consumption,
-                self.subscription_id,
-                start.isoformat(),
-                end_date.isoformat(),
-            )
+
+            entries: list[dict] = []
+            cur = start
+            while cur <= end_date:
+                chunk_end = min(end_date, cur + timedelta(days=365))
+                chunk = await self.hass.async_add_executor_job(
+                    self.client.get_daily_consumption,
+                    self.subscription_id,
+                    cur.isoformat(),
+                    chunk_end.isoformat(),
+                )
+                entries.extend(chunk)
+                cur = chunk_end + timedelta(days=1)
 
             valid = [
                 e
