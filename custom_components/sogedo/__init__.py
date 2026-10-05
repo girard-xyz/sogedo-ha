@@ -23,18 +23,22 @@ def token_store(hass: HomeAssistant, entry: ConfigEntry) -> Store:
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    store = token_store(hass, entry)
+    stored = await store.async_load() or {}
+
+    async def _save(**updates: object) -> None:
+        data = await store.async_load() or {}
+        data.update(updates)
+        await store.async_save(data)
+
     # Prefer the latest rotated refresh token so restarts never force a re-auth
     # (Sogedo's refresh token only lives ~24h but is renewed on every poll).
-    store = token_store(hass, entry)
-    stored = await store.async_load()
-    refresh_token = (stored or {}).get("refresh_token") or entry.data[
-        CONF_REFRESH_TOKEN
-    ]
+    refresh_token = stored.get("refresh_token") or entry.data[CONF_REFRESH_TOKEN]
 
     client = SogedoClient(refresh_token)
 
     async def _persist_token(token: str) -> None:
-        await store.async_save({"refresh_token": token})
+        await _save(refresh_token=token)
 
     coordinator = SogedoCoordinator(
         hass,
