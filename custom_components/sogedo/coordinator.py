@@ -11,7 +11,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.util import dt as dt_util
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .const import BACKFILL_DAYS, SCAN_INTERVAL_SECONDS, UPDATE_DATE_OFFSET
+from .const import BACKFILL_DAYS, DOMAIN, SCAN_INTERVAL_SECONDS, UPDATE_DATE_OFFSET
 from .sogedo_api import SogedoAuthError, SogedoClient, select_latest
 
 _LOGGER = logging.getLogger(__name__)
@@ -250,6 +250,46 @@ class SogedoCoordinator(DataUpdateCoordinator[dict]):
                 _LOGGER.info("Sogedo water source Coût set to %s", COST_STATISTIC_ID)
         except Exception:  # noqa: BLE001
             _LOGGER.debug("Could not set the energy cost statistic", exc_info=True)
+
+    async def async_cleanup_old_statistics(self) -> None:
+        """One-time removal of stray statistics written by earlier versions.
+
+        Earlier versions imported rows into the live cumulative sensor's
+        statistic_id (and a fallback), producing incoherent history. Clear
+        those statistics so the old sensor's history no longer shows jumps.
+        """
+        try:
+            import asyncio
+
+            from homeassistant.components.recorder import get_instance
+            from homeassistant.helpers.entity_registry import (
+                async_get as async_get_entity_registry,
+            )
+
+            stat_ids = {"sensor.sogedo_water_cumulative"}
+            registry = async_get_entity_registry(self.hass)
+            for entity in registry.entities.values():
+                if entity.platform == DOMAIN and entity.unique_id.endswith(
+                    "_cumulative"
+                ):
+                    stat_ids.add(entity.entity_id)
+
+            instance = get_instance(self.hass)
+            done = asyncio.Event()
+            instance.async_clear_statistics(
+                list(stat_ids),
+                on_done=lambda: self.hass.loop.call_soon_threadsafe(done.set),
+            )
+            try:
+                async with asyncio.timeout(30):
+                    await done.wait()
+            except TimeoutError:
+                return
+            _LOGGER.info(
+                "Sogedo cleared stray statistics: %s", ", ".join(sorted(stat_ids))
+            )
+        except Exception:  # noqa: BLE001
+            _LOGGER.debug("Could not clean stray statistics", exc_info=True)
 
     async def _append_recent(self, today: datetime.date) -> None:
         """Extend the history statistics with any new days since the last run."""

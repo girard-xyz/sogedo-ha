@@ -53,6 +53,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # turns into an automatic reauth prompt (no need to delete the entry).
     await coordinator.async_config_entry_first_refresh()
 
+    # One-time cleanup of stray statistics written by earlier buggy versions.
+    if not stored.get("cleaned_old_stats"):
+        await coordinator.async_cleanup_old_statistics()
+        await _save(cleaned_old_stats=True)
+
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
 
