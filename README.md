@@ -30,7 +30,7 @@ Reads your daily water consumption from [mon-compte.sogedo.fr](https://mon-compt
 1. **HACS** → ⋯ (Custom repositories) → add `https://github.com/girard-xyz/sogedo-ha` → category **Integration** → install. (Or use the **Add repository** button at the top of this page.)
 2. **Restart Home Assistant.**
 3. **Settings → Devices & Services → Add Integration → Sogedo Water.**
-4. **Authorize:** click the link, log in to Sogedo, copy the `code=...` value from the redirect URL, and paste it back.
+4. **Authorize:** in the dialog, open the login link, log in to Sogedo, then **copy the entire address** you are redirected to and paste it back (a single dialog with step-by-step instructions).
 
 ### Entities
 
@@ -93,7 +93,7 @@ The refresh token is renewed automatically on every poll and persisted, so **no 
 1. **HACS** → ⋯ (Dépôts personnalisés) → ajouter `https://github.com/girard-xyz/sogedo-ha` → catégorie **Intégration** → installer. (Ou utiliser le bouton **Add repository** en haut de cette page.)
 2. **Redémarrer Home Assistant.**
 3. **Paramètres → Périphériques et services → Ajouter une intégration → Sogedo Water.**
-4. **Autoriser :** cliquer sur le lien, se connecter à Sogedo, copier la valeur `code=...` de l'URL de redirection et la coller.
+4. **Autoriser :** dans la fenêtre, ouvrez le lien de connexion, connectez-vous à Sogedo, puis **copiez l'adresse complète** de redirection et collez-la (une seule fenêtre avec les étapes guidées).
 
 ### Entités
 

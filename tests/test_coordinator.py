@@ -33,6 +33,8 @@ def _load_with_const(modname, filename, pkg_name):
 
 api = _load_with_const("sogedo_api", BASE / "sogedo_api.py", "sogedo_api_pkg")
 select_latest = api.select_latest
+extract_code = api.extract_code
+extract_state = api.extract_state
 
 
 def test_select_latest_skips_unavailable_and_zero_days():
@@ -55,3 +57,20 @@ def test_select_latest_falls_back_to_last_entry():
 
 def test_select_latest_empty():
     assert select_latest([]) is None
+
+
+def test_extract_code_from_full_url():
+    url = "https://mon-compte.sogedo.fr/auth?code=ABC123&state=sogedo-xyz&foo=bar"
+    assert extract_code(url) == "ABC123"
+    assert extract_state(url) == "sogedo-xyz"
+
+
+def test_extract_code_from_fragment_and_raw():
+    assert extract_code("code=ABC123&state=sogedo-xyz") == "ABC123"
+    assert extract_code("  RAWCODE  ") == "RAWCODE"
+
+
+def test_extract_code_missing():
+    assert extract_code("") is None
+    assert extract_code("https://mon-compte.sogedo.fr/auth?state=sogedo-xyz") is None
+    assert extract_state("RAWCODE") is None

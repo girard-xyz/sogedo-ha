@@ -2,17 +2,13 @@
   "config": {
     "step": {
       "authorize": {
-        "title": "Authorize Sogedo",
-        "description": "Click [here]({authorize_url}) to open the Sogedo authorization page. Log in, then copy the value of `code=` from the redirect URL and continue.",
+        "title": "Sign in to Sogedo",
+        "description": "**Step 1 — Open the Sogedo login page**\n\n[**Open the Sogedo login page**]({authorize_url})\n\nIf the link does not open, copy this address into your browser: `{authorize_url}`\n\n**Step 2 — Log in** with your Sogedo account (email and password).\n\n**Step 3 — Copy the address.** After logging in you land on a page that may look empty; its address bar then contains `code=...`. **Copy the entire address** (Ctrl/Cmd + C).\n\n**Step 4 — Paste** it in the field below and click **Submit**.",
         "data": {
-          "authorize_url": "Authorization URL"
-        }
-      },
-      "token": {
-        "title": "Authorization code",
-        "description": "Paste the `code` value from the redirect URL here.",
-        "data": {
-          "code": "Authorization code"
+          "code": "Authorization code (or the full redirect address)"
+        },
+        "data_description": {
+          "code": "Paste the whole address, e.g. https://mon-compte.sogedo.fr/auth?code=..."
         }
       },
       "subscription": {
@@ -24,7 +20,9 @@
       }
     },
     "error": {
-      "invalid_code": "The authorization code is invalid or expired. Try again.",
+      "no_code": "No authorization code was found. Copy the full address bar of the page you were redirected to.",
+      "state_mismatch": "This code was not issued from the link above. Open the link again, log in, and paste the new address.",
+      "invalid_code": "The code is invalid or has expired. Open the link again, log in, and paste a fresh code.",
       "unknown": "An unexpected error occurred."
     },
     "abort": {

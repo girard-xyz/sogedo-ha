@@ -31,13 +31,14 @@ from .sogedo_api import (
     SogedoClient,
     build_authorize_url,
     exchange_code,
+    extract_code,
+    extract_state,
     generate_pkce,
 )
 
 _LOGGER = logging.getLogger(__name__)
 
 AUTHORIZE_STEP = "authorize"
-TOKEN_STEP = "token"
 SUBSCRIPTION_STEP = "subscription"
 
 
@@ -60,6 +61,7 @@ class SogedoConfigFlow(ConfigFlow, domain=DOMAIN):
         self._code_verifier: str | None = None
         self._code_challenge: str | None = None
         self._state: str | None = None
+        self._authorize_url: str | None = None
         self._refresh_token: str | None = None
         self._subscriptions: list[dict[str, Any]] = []
 
@@ -71,48 +73,48 @@ class SogedoConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_authorize(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Show the authorization URL to the user."""
-        if user_input is None:
+        """Show the login link and collect the pasted authorization code."""
+        if self._code_verifier is None:
             self._code_verifier, self._code_challenge = generate_pkce()
             self._state = "sogedo-" + self._code_challenge[:8]
-            url = build_authorize_url(self._code_challenge, self._state)
-            return self.async_show_form(
-                step_id=AUTHORIZE_STEP,
-                data_schema=vol.Schema({}),
-                description_placeholders={"authorize_url": url},
+            self._authorize_url = build_authorize_url(
+                self._code_challenge, self._state
             )
-        return await self.async_step_token()
 
-    async def async_step_token(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
-        """Exchange the pasted authorization code."""
         errors: dict[str, str] = {}
         if user_input is not None:
-            code = user_input["code"]
-            try:
-                client, self._refresh_token = await validate_and_build_client(
-                    self.hass, code, self._code_verifier
-                )
-                self._subscriptions = await self.hass.async_add_executor_job(
-                    client.get_subscriptions
-                )
-            except SogedoAuthError:
-                errors["base"] = "invalid_code"
-            except Exception:  # noqa: BLE001
-                _LOGGER.exception("Unexpected error during auth")
-                errors["base"] = "unknown"
+            pasted = user_input["code"]
+            code = extract_code(pasted)
+            state = extract_state(pasted)
+            if state is not None and state != self._state:
+                errors["base"] = "state_mismatch"
+            elif not code:
+                errors["base"] = "no_code"
+            else:
+                try:
+                    client, self._refresh_token = await validate_and_build_client(
+                        self.hass, code, self._code_verifier
+                    )
+                    self._subscriptions = await self.hass.async_add_executor_job(
+                        client.get_subscriptions
+                    )
+                except SogedoAuthError:
+                    errors["base"] = "invalid_code"
+                except Exception:  # noqa: BLE001
+                    _LOGGER.exception("Unexpected error during auth")
+                    errors["base"] = "unknown"
 
-            if not errors:
-                if self.source == config_entries.SOURCE_REAUTH:
-                    return await self._update_existing_entry()
-                if len(self._subscriptions) == 1:
-                    return self._create_entry(self._subscriptions[0])
-                return await self.async_step_subscription()
+                if not errors:
+                    if self.source == config_entries.SOURCE_REAUTH:
+                        return await self._update_existing_entry()
+                    if len(self._subscriptions) == 1:
+                        return self._create_entry(self._subscriptions[0])
+                    return await self.async_step_subscription()
 
         return self.async_show_form(
-            step_id=TOKEN_STEP,
+            step_id=AUTHORIZE_STEP,
             data_schema=vol.Schema({vol.Required("code"): str}),
+            description_placeholders={"authorize_url": self._authorize_url},
             errors=errors,
         )
 

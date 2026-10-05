@@ -2,17 +2,13 @@
   "config": {
     "step": {
       "authorize": {
-        "title": "Autoriser Sogedo",
-        "description": "Cliquez [ici]({authorize_url}) pour ouvrir la page d'autorisation Sogedo. Connectez-vous, puis copiez la valeur de `code=` dans l'URL de redirection et continuez.",
+        "title": "Connexion à Sogedo",
+        "description": "**Étape 1 — Ouvrir la page de connexion Sogedo**\n\n[**Ouvrir la page de connexion Sogedo**]({authorize_url})\n\nSi le lien ne s'ouvre pas, copiez cette adresse dans votre navigateur : `{authorize_url}`\n\n**Étape 2 — Connectez-vous** avec votre compte Sogedo (e-mail et mot de passe).\n\n**Étape 3 — Copiez l'adresse.** Après connexion, une page (parfois vide) s'affiche ; son adresse contient alors `code=...`. **Copiez l'adresse complète** (Ctrl/Cmd + C).\n\n**Étape 4 — Collez** l'adresse ci-dessous puis cliquez sur **Envoyer**.",
         "data": {
-          "authorize_url": "URL d'autorisation"
-        }
-      },
-      "token": {
-        "title": "Code d'autorisation",
-        "description": "Collez ici la valeur `code` de l'URL de redirection.",
-        "data": {
-          "code": "Code d'autorisation"
+          "code": "Code d'autorisation (ou l'adresse de redirection complète)"
+        },
+        "data_description": {
+          "code": "Collez l'adresse complète, ex. https://mon-compte.sogedo.fr/auth?code=..."
         }
       },
       "subscription": {
@@ -24,7 +20,9 @@
       }
     },
     "error": {
-      "invalid_code": "Le code d'autorisation est invalide ou expiré. Réessayez.",
+      "no_code": "Aucun code d'autorisation trouvé. Copiez l'adresse complète de la page de redirection.",
+      "state_mismatch": "Ce code ne provient pas du lien ci-dessus. Rouvrez le lien, reconnectez-vous et collez la nouvelle adresse.",
+      "invalid_code": "Le code est invalide ou expiré. Rouvrez le lien, reconnectez-vous et collez un nouveau code.",
       "unknown": "Une erreur inattendue s'est produite."
     },
     "abort": {

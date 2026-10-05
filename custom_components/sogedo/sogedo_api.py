@@ -15,7 +15,7 @@ import logging
 import os
 import time
 from typing import Any
-from urllib.parse import urlencode
+from urllib.parse import parse_qs, urlencode, urlparse
 
 import requests
 
@@ -39,6 +39,34 @@ AUTHORIZE_ENDPOINT = f"{AUTHORITY}/oauth2/v2.0/authorize"
 
 class SogedoAuthError(Exception):
     """Raised when authentication fails."""
+
+
+def _parse_pasted(value: str) -> dict[str, list[str]]:
+    """Parse a pasted redirect URL or query fragment into its parameters."""
+    value = (value or "").strip()
+    if value.startswith("http"):
+        return parse_qs(urlparse(value).query)
+    if "code=" in value or "state=" in value or "&" in value:
+        return parse_qs(value)
+    return {}
+
+
+def extract_code(value: str) -> str | None:
+    """Return the authorization code from a pasted URL, fragment or raw code."""
+    value = (value or "").strip()
+    if not value:
+        return None
+    params = _parse_pasted(value)
+    if params:
+        codes = params.get("code")
+        return codes[0] if codes else None
+    return value
+
+
+def extract_state(value: str) -> str | None:
+    """Return the `state` from a pasted URL/fragment, if present."""
+    states = _parse_pasted(value).get("state")
+    return states[0] if states else None
 
 
 def generate_pkce() -> tuple[str, str]:
