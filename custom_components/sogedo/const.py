@@ -5,6 +5,9 @@ from homeassistant.const import Platform
 DOMAIN = "sogedo"
 PLATFORMS = [Platform.BUTTON, Platform.SENSOR]
 
+# Version of the local token store
+STORAGE_VERSION = 1
+
 # Config entry keys
 CONF_REFRESH_TOKEN = "refresh_token"
 CONF_SUBSCRIPTION_ID = "subscription_id"

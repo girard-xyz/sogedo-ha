@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Awaitable, Callable
 from datetime import datetime, timedelta
 
 from homeassistant.config_entries import ConfigEntry, ConfigEntryAuthFailed
@@ -31,6 +32,7 @@ class SogedoCoordinator(DataUpdateCoordinator[dict]):
         client: SogedoClient,
         subscription_id: str,
         entry: ConfigEntry,
+        persist_token: Callable[[str], Awaitable[None]] | None = None,
     ) -> None:
         super().__init__(
             hass,
@@ -41,6 +43,8 @@ class SogedoCoordinator(DataUpdateCoordinator[dict]):
         )
         self.client = client
         self.subscription_id = subscription_id
+        self._persist_token = persist_token
+        self._last_token = client.refresh_token
         self._backfilled = False
         self._history_sum = 0.0
         self._history_cost_sum = 0.0
@@ -82,7 +86,20 @@ class SogedoCoordinator(DataUpdateCoordinator[dict]):
         else:
             await self._append_recent(today)
 
+        await self._save_token()
         return data
+
+    async def _save_token(self) -> None:
+        """Persist a rotated refresh token so restarts keep the session alive."""
+        if self._persist_token is None:
+            return
+        token = self.client.refresh_token
+        if token and token != self._last_token:
+            try:
+                await self._persist_token(token)
+                self._last_token = token
+            except Exception:  # noqa: BLE001
+                _LOGGER.debug("Could not persist refresh token", exc_info=True)
 
     async def async_refresh_history(self) -> None:
         """Re-run the full backfill on demand (idempotent upsert)."""

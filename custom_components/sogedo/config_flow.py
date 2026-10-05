@@ -17,12 +17,14 @@ from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
 from homeassistant.const import CONF_NAME
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers.storage import Store
 
 from .const import (
     CONF_REFRESH_TOKEN,
     CONF_SUBSCRIPTION_ID,
     CONF_SUBSCRIPTION_NAME,
     DOMAIN,
+    STORAGE_VERSION,
 )
 from .sogedo_api import (
     SogedoAuthError,
@@ -103,7 +105,7 @@ class SogedoConfigFlow(ConfigFlow, domain=DOMAIN):
 
             if not errors:
                 if self.source == config_entries.SOURCE_REAUTH:
-                    return self._update_existing_entry()
+                    return await self._update_existing_entry()
                 if len(self._subscriptions) == 1:
                     return self._create_entry(self._subscriptions[0])
                 return await self.async_step_subscription()
@@ -143,11 +145,18 @@ class SogedoConfigFlow(ConfigFlow, domain=DOMAIN):
         title = sub.get("address") or "Sogedo"
         return self.async_create_entry(title=title, data=data)
 
-    def _update_existing_entry(self) -> ConfigFlowResult:
+    async def _update_existing_entry(self) -> ConfigFlowResult:
         """Update the existing entry with a fresh token (entities preserved)."""
         entry = self._get_reauth_entry()
         data = dict(entry.data)
         data[CONF_REFRESH_TOKEN] = self._refresh_token
+        # Keep the local token store in sync so a stale stored token can't
+        # override the freshly obtained one on the following setup.
+        try:
+            store = Store(self.hass, STORAGE_VERSION, f"{DOMAIN}.{entry.entry_id}")
+            await store.async_save({"refresh_token": self._refresh_token})
+        except Exception:  # noqa: BLE001
+            _LOGGER.debug("Could not persist the reauth token", exc_info=True)
         return self.async_update_reload_and_abort(entry, data=data)
 
     async def async_step_reauth(

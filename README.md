@@ -66,6 +66,8 @@ The backfill writes running cumulatives of the daily consumption and cost, so ev
 
 Sogedo uses Azure AD B2C and disables device-code and username/password (ROPC) flows, so setup requires the one-time interactive authorization-code flow described above. Your Sogedo password is never stored — only a refresh token in Home Assistant's config entry.
 
+The refresh token is renewed automatically on every poll and persisted, so **no periodic re-authentication is needed**; you only re-authorize if Home Assistant has been off for more than ~24 hours (after which the token can no longer be renewed).
+
 ---
 
 ## Français / French
@@ -126,3 +128,5 @@ Le rétro-remplissage écrit des cumuls de consommation et de coût, si bien que
 ### Notes
 
 Sogedo utilise Azure AD B2C et désactive les flux device-code et identifiant/mot de passe (ROPC) : l'installation nécessite donc le flux interactif d'autorisation décrit ci-dessus. Votre mot de passe Sogedo n'est jamais stocké — seul un jeton d'actualisation est conservé dans la configuration de l'intégration.
+
+Le jeton d'actualisation est renouvelé automatiquement à chaque interrogation et conservé : **aucune ré-authentification périodique n'est nécessaire** ; vous ne vous réauthentifiez que si Home Assistant est resté éteint plus de ~24 h (au-delà desquelles le jeton ne peut plus être renouvelé).
