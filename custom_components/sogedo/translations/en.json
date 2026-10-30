@@ -1,14 +1,12 @@
 {
   "config": {
     "step": {
-      "authorize": {
+      "credentials": {
         "title": "Sign in to Sogedo",
-        "description": "**Step 1 — Open the Sogedo login page**\n\n[**Open the Sogedo login page**]({authorize_url})\n\nIf the link does not open, copy this address into your browser: `{authorize_url}`\n\n**Step 2 — Log in** with your Sogedo account (email and password).\n\n**Step 3 — Copy the address.** After logging in you land on a page that may look empty; its address bar then contains `code=...`. **Copy the entire address** (Ctrl/Cmd + C).\n\n**Step 4 — Paste** it in the field below and click **Submit**.",
+        "description": "Enter the email and password of your Sogedo online account. They are stored in Home Assistant so the integration can sign in again automatically.",
         "data": {
-          "code": "Authorization code (or the full redirect address)"
-        },
-        "data_description": {
-          "code": "Paste the whole address, e.g. https://mon-compte.sogedo.fr/auth?code=..."
+          "email": "Email",
+          "password": "Password"
         }
       },
       "subscription": {
@@ -20,9 +18,7 @@
       }
     },
     "error": {
-      "no_code": "No authorization code was found. Copy the full address bar of the page you were redirected to.",
-      "state_mismatch": "This code was not issued from the link above. Open the link again, log in, and paste the new address.",
-      "invalid_code": "The code is invalid or has expired. Open the link again, log in, and paste a fresh code.",
+      "invalid_auth": "Wrong email or password, or Sogedo changed its login page.",
       "unknown": "An unexpected error occurred."
     },
     "abort": {

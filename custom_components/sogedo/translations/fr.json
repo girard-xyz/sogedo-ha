@@ -1,14 +1,12 @@
 {
   "config": {
     "step": {
-      "authorize": {
+      "credentials": {
         "title": "Connexion à Sogedo",
-        "description": "**Étape 1 — Ouvrir la page de connexion Sogedo**\n\n[**Ouvrir la page de connexion Sogedo**]({authorize_url})\n\nSi le lien ne s'ouvre pas, copiez cette adresse dans votre navigateur : `{authorize_url}`\n\n**Étape 2 — Connectez-vous** avec votre compte Sogedo (e-mail et mot de passe).\n\n**Étape 3 — Copiez l'adresse.** Après connexion, une page (parfois vide) s'affiche ; son adresse contient alors `code=...`. **Copiez l'adresse complète** (Ctrl/Cmd + C).\n\n**Étape 4 — Collez** l'adresse ci-dessous puis cliquez sur **Envoyer**.",
+        "description": "Saisissez l'e-mail et le mot de passe de votre compte Sogedo. Ils sont enregistrés dans Home Assistant pour que l'intégration puisse se reconnecter automatiquement.",
         "data": {
-          "code": "Code d'autorisation (ou l'adresse de redirection complète)"
-        },
-        "data_description": {
-          "code": "Collez l'adresse complète, ex. https://mon-compte.sogedo.fr/auth?code=..."
+          "email": "E-mail",
+          "password": "Mot de passe"
         }
       },
       "subscription": {
@@ -20,9 +18,7 @@
       }
     },
     "error": {
-      "no_code": "Aucun code d'autorisation trouvé. Copiez l'adresse complète de la page de redirection.",
-      "state_mismatch": "Ce code ne provient pas du lien ci-dessus. Rouvrez le lien, reconnectez-vous et collez la nouvelle adresse.",
-      "invalid_code": "Le code est invalide ou expiré. Rouvrez le lien, reconnectez-vous et collez un nouveau code.",
+      "invalid_auth": "E-mail ou mot de passe incorrect, ou page de connexion Sogedo modifiée.",
       "unknown": "Une erreur inattendue s'est produite."
     },
     "abort": {

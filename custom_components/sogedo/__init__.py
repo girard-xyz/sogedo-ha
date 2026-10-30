@@ -7,6 +7,8 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.storage import Store
 
 from .const import (
+    CONF_EMAIL,
+    CONF_PASSWORD,
     CONF_REFRESH_TOKEN,
     CONF_SUBSCRIPTION_ID,
     DOMAIN,
@@ -31,11 +33,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         data.update(updates)
         await store.async_save(data)
 
-    # Prefer the latest rotated refresh token so restarts never force a re-auth
-    # (Sogedo's refresh token only lives ~24h but is renewed on every poll).
-    refresh_token = stored.get("refresh_token") or entry.data[CONF_REFRESH_TOKEN]
+    # Prefer the latest rotated refresh token. If it has lapsed, the client
+    # signs in again with the stored credentials (no prompt needed).
+    refresh_token = stored.get("refresh_token") or entry.data.get(CONF_REFRESH_TOKEN)
 
-    client = SogedoClient(refresh_token)
+    client = SogedoClient(
+        entry.data.get(CONF_EMAIL, ""),
+        entry.data.get(CONF_PASSWORD, ""),
+        refresh_token,
+    )
 
     async def _persist_token(token: str) -> None:
         await _save(refresh_token=token)

@@ -9,6 +9,8 @@ PLATFORMS = [Platform.BUTTON, Platform.SENSOR]
 STORAGE_VERSION = 1
 
 # Config entry keys
+CONF_EMAIL = "email"
+CONF_PASSWORD = "password"
 CONF_REFRESH_TOKEN = "refresh_token"
 CONF_SUBSCRIPTION_ID = "subscription_id"
 CONF_SUBSCRIPTION_NAME = "subscription_name"

@@ -1,8 +1,7 @@
 """Config flow for the Sogedo water integration.
 
-Uses the interactive Azure AD B2C authorization-code flow with PKCE. Since
-device-code and ROPC are disabled by Sogedo, the user logs in via the browser
-and pastes the `code` from the redirect URL back into Home Assistant.
+Signs in to Sogedo with the account email/password. The credentials are kept in
+the config entry so the client can sign in again when its refresh token lapses.
 """
 
 from __future__ import annotations
@@ -14,42 +13,43 @@ import voluptuous as vol
 
 from homeassistant import config_entries
 from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
-from homeassistant.const import CONF_NAME
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers.selector import TextSelector, TextSelectorType
 from homeassistant.helpers.storage import Store
 
 from .const import (
+    CONF_EMAIL,
+    CONF_PASSWORD,
     CONF_REFRESH_TOKEN,
     CONF_SUBSCRIPTION_ID,
     CONF_SUBSCRIPTION_NAME,
     DOMAIN,
     STORAGE_VERSION,
 )
-from .sogedo_api import (
-    SogedoAuthError,
-    SogedoClient,
-    build_authorize_url,
-    exchange_code,
-    extract_code,
-    extract_state,
-    generate_pkce,
-)
+from .sogedo_api import SogedoAuthError, SogedoClient, login
 
 _LOGGER = logging.getLogger(__name__)
 
-AUTHORIZE_STEP = "authorize"
+CREDENTIALS_STEP = "credentials"
 SUBSCRIPTION_STEP = "subscription"
 
 
-async def validate_and_build_client(
-    hass: HomeAssistant, code: str, code_verifier: str
+def _credentials_schema() -> vol.Schema:
+    return vol.Schema(
+        {
+            vol.Required(CONF_EMAIL): str,
+            vol.Required(CONF_PASSWORD): TextSelector(TextSelectorType.PASSWORD),
+        }
+    )
+
+
+async def validate_credentials(
+    hass: HomeAssistant, email: str, password: str
 ) -> tuple[SogedoClient, str]:
-    """Exchange the code and return (client, refresh_token)."""
-    tokens = await hass.async_add_executor_job(exchange_code, code, code_verifier)
+    """Sign in and return (client, refresh_token)."""
+    tokens = await hass.async_add_executor_job(login, email, password)
     refresh_token = tokens["refresh_token"]
-    client = SogedoClient(refresh_token)
-    return client, refresh_token
+    return SogedoClient(email, password, refresh_token), refresh_token
 
 
 class SogedoConfigFlow(ConfigFlow, domain=DOMAIN):
@@ -58,63 +58,49 @@ class SogedoConfigFlow(ConfigFlow, domain=DOMAIN):
     VERSION = 1
 
     def __init__(self) -> None:
-        self._code_verifier: str | None = None
-        self._code_challenge: str | None = None
-        self._state: str | None = None
-        self._authorize_url: str | None = None
+        self._email: str = ""
+        self._password: str = ""
         self._refresh_token: str | None = None
         self._subscriptions: list[dict[str, Any]] = []
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        return await self.async_step_authorize()
+        return await self.async_step_credentials(user_input)
 
-    async def async_step_authorize(
+    async def async_step_credentials(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Show the login link and collect the pasted authorization code."""
-        if self._code_verifier is None:
-            self._code_verifier, self._code_challenge = generate_pkce()
-            self._state = "sogedo-" + self._code_challenge[:8]
-            self._authorize_url = build_authorize_url(
-                self._code_challenge, self._state
-            )
-
+        """Collect the Sogedo email and password."""
         errors: dict[str, str] = {}
         if user_input is not None:
-            pasted = user_input["code"]
-            code = extract_code(pasted)
-            state = extract_state(pasted)
-            if state is not None and state != self._state:
-                errors["base"] = "state_mismatch"
-            elif not code:
-                errors["base"] = "no_code"
-            else:
-                try:
-                    client, self._refresh_token = await validate_and_build_client(
-                        self.hass, code, self._code_verifier
-                    )
-                    self._subscriptions = await self.hass.async_add_executor_job(
-                        client.get_subscriptions
-                    )
-                except SogedoAuthError:
-                    errors["base"] = "invalid_code"
-                except Exception:  # noqa: BLE001
-                    _LOGGER.exception("Unexpected error during auth")
-                    errors["base"] = "unknown"
+            email = user_input[CONF_EMAIL].strip()
+            password = user_input[CONF_PASSWORD]
+            try:
+                client, self._refresh_token = await validate_credentials(
+                    self.hass, email, password
+                )
+                self._subscriptions = await self.hass.async_add_executor_job(
+                    client.get_subscriptions
+                )
+            except SogedoAuthError:
+                errors["base"] = "invalid_auth"
+            except Exception:  # noqa: BLE001
+                _LOGGER.exception("Unexpected error during auth")
+                errors["base"] = "unknown"
 
-                if not errors:
-                    if self.source == config_entries.SOURCE_REAUTH:
-                        return await self._update_existing_entry()
-                    if len(self._subscriptions) == 1:
-                        return self._create_entry(self._subscriptions[0])
-                    return await self.async_step_subscription()
+            if not errors:
+                self._email = email
+                self._password = password
+                if self.source == config_entries.SOURCE_REAUTH:
+                    return await self._update_existing_entry()
+                if len(self._subscriptions) == 1:
+                    return self._create_entry(self._subscriptions[0])
+                return await self.async_step_subscription()
 
         return self.async_show_form(
-            step_id=AUTHORIZE_STEP,
-            data_schema=vol.Schema({vol.Required("code"): str}),
-            description_placeholders={"authorize_url": self._authorize_url},
+            step_id=CREDENTIALS_STEP,
+            data_schema=_credentials_schema(),
             errors=errors,
         )
 
@@ -140,6 +126,8 @@ class SogedoConfigFlow(ConfigFlow, domain=DOMAIN):
 
     def _create_entry(self, sub: dict[str, Any]) -> ConfigFlowResult:
         data = {
+            CONF_EMAIL: self._email,
+            CONF_PASSWORD: self._password,
             CONF_REFRESH_TOKEN: self._refresh_token,
             CONF_SUBSCRIPTION_ID: sub["id"],
             CONF_SUBSCRIPTION_NAME: sub["address"],
@@ -148,9 +136,11 @@ class SogedoConfigFlow(ConfigFlow, domain=DOMAIN):
         return self.async_create_entry(title=title, data=data)
 
     async def _update_existing_entry(self) -> ConfigFlowResult:
-        """Update the existing entry with a fresh token (entities preserved)."""
+        """Update the existing entry with fresh credentials (entities preserved)."""
         entry = self._get_reauth_entry()
         data = dict(entry.data)
+        data[CONF_EMAIL] = self._email
+        data[CONF_PASSWORD] = self._password
         data[CONF_REFRESH_TOKEN] = self._refresh_token
         # Keep the local token store in sync so a stale stored token can't
         # override the freshly obtained one on the following setup.
@@ -162,6 +152,7 @@ class SogedoConfigFlow(ConfigFlow, domain=DOMAIN):
         return self.async_update_reload_and_abort(entry, data=data)
 
     async def async_step_reauth(
-        self, user_input: dict[str, Any] | None = None
+        self, entry_data: dict[str, Any]
     ) -> ConfigFlowResult:
-        return await self.async_step_authorize()
+        # HA passes the entry data here; show the credentials form instead.
+        return await self.async_step_credentials()

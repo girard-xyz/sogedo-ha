@@ -18,7 +18,7 @@ Reads your daily water consumption from [mon-compte.sogedo.fr](https://mon-compt
 - **Refresh history** button (`button.sogedo_actualiser_l_historique`) — re-runs the backfill on demand (idempotent, safe to press any time).
 - Backfills your full water history on first setup (best-effort; a failure never breaks the integration).
 - Updates every 6 hours (Sogedo publishes data daily).
-- Auto-triggers an in-place re-auth if the token expires (entities are preserved).
+- Signs in again automatically when the session expires (email/password stored once).
 
 ### Requirements
 
@@ -30,7 +30,7 @@ Reads your daily water consumption from [mon-compte.sogedo.fr](https://mon-compt
 1. **HACS** → ⋯ (Custom repositories) → add `https://github.com/girard-xyz/sogedo-ha` → category **Integration** → install. (Or use the **Add repository** button at the top of this page.)
 2. **Restart Home Assistant.**
 3. **Settings → Devices & Services → Add Integration → Sogedo Water.**
-4. **Authorize:** in the dialog, open the login link, log in to Sogedo, then **copy the entire address** you are redirected to and paste it back (a single dialog with step-by-step instructions).
+4. **Sign in:** enter your Sogedo account email and password in the dialog.
 
 ### Entities
 
@@ -59,14 +59,14 @@ The backfill writes running cumulatives of the daily consumption and cost, so ev
 ### Troubleshooting
 
 - **"Sogedo backfill failed; skipping"** in the logs → open the log entry for the full traceback (usually a transient API/network issue; press the button to retry).
-- **Token expired** (HA off for > 24 h) → Home Assistant shows a **re-auth** prompt (the entry shows *Reconfigurer* / *Connexion requise*). Re-authenticate in place — entities and dashboard settings are preserved.
+- **Login rejected** → the entry shows *Reconfigurer* / *Connexion requise*: re-enter your email and password in place — entities and dashboard settings are preserved.
 - **No new data** → check the sensor's last update; Sogedo publishes the previous day (J-1).
 
 ### Notes
 
-Sogedo uses Azure AD B2C and disables device-code and username/password (ROPC) flows, so setup requires the one-time interactive authorization-code flow described above. Your Sogedo password is never stored — only a refresh token in Home Assistant's config entry.
+Sogedo uses Azure AD B2C: the integration signs in through the portal's own login page, so your email and password are stored in Home Assistant's config entry (plain text, like most Home Assistant integrations) and are used to sign in again when the session expires.
 
-The refresh token is renewed automatically on every poll and persisted, so **no periodic re-authentication is needed**; you only re-authorize if Home Assistant has been off for more than ~24 hours (after which the token can no longer be renewed).
+The refresh token is renewed on every poll and persisted; when it lapses, the integration signs in again automatically. No periodic re-authentication is needed. If you change your Sogedo password or Sogedo changes its login page, Home Assistant asks you to sign in again.
 
 ---
 
@@ -81,7 +81,7 @@ The refresh token is renewed automatically on every poll and persisted, so **no 
 - **Actualiser l'historique** (`button.actualiser_l_historique`) — relance le rétro-remplissage à la demande (idempotent, sans risque).
 - Rétro-remplit tout l'historique au premier démarrage (non bloquant en cas d'échec).
 - Mise à jour toutes les 6 heures (Sogedo publie les données quotidiennement).
-- Ré-authentification automatique si le jeton expire (les entités sont conservées).
+- Reconnexion automatique quand la session expire (e-mail / mot de passe enregistrés une fois).
 
 ### Prérequis
 
@@ -93,7 +93,7 @@ The refresh token is renewed automatically on every poll and persisted, so **no 
 1. **HACS** → ⋯ (Dépôts personnalisés) → ajouter `https://github.com/girard-xyz/sogedo-ha` → catégorie **Intégration** → installer. (Ou utiliser le bouton **Add repository** en haut de cette page.)
 2. **Redémarrer Home Assistant.**
 3. **Paramètres → Périphériques et services → Ajouter une intégration → Sogedo Water.**
-4. **Autoriser :** dans la fenêtre, ouvrez le lien de connexion, connectez-vous à Sogedo, puis **copiez l'adresse complète** de redirection et collez-la (une seule fenêtre avec les étapes guidées).
+4. **Connexion :** saisissez l'e-mail et le mot de passe de votre compte Sogedo dans la fenêtre.
 
 ### Entités
 
@@ -122,11 +122,11 @@ Le rétro-remplissage écrit des cumuls de consommation et de coût, si bien que
 ### Dépannage
 
 - **« Sogedo backfill failed; skipping »** dans les journaux → ouvrir l'entrée pour la trace complète (souvent un problème API/réseau passager ; relancer via le bouton).
-- **Jeton expiré** (HA éteint plus de 24 h) → Home Assistant affiche une invite de **ré-authentification** (l'entrée montre *Reconfigurer* / *Connexion requise*). Ré-authentifiez sur place — les entités et les réglages Énergie sont conservés.
+- **Connexion refusée** → l'entrée affiche *Reconfigurer* / *Connexion requise* : resaisissez votre e-mail et votre mot de passe sur place — les entités et les réglages Énergie sont conservés.
 - **Pas de nouvelles données** → vérifier la dernière mise à jour du capteur ; Sogedo publie la veille (J-1).
 
 ### Notes
 
-Sogedo utilise Azure AD B2C et désactive les flux device-code et identifiant/mot de passe (ROPC) : l'installation nécessite donc le flux interactif d'autorisation décrit ci-dessus. Votre mot de passe Sogedo n'est jamais stocké — seul un jeton d'actualisation est conservé dans la configuration de l'intégration.
+Sogedo utilise Azure AD B2C : l'intégration se connecte via la page de connexion du portail, donc votre e-mail et votre mot de passe sont enregistrés dans la configuration de Home Assistant (en clair, comme la plupart des intégrations) et servent à se reconnecter quand la session expire.
 
-Le jeton d'actualisation est renouvelé automatiquement à chaque interrogation et conservé : **aucune ré-authentification périodique n'est nécessaire** ; vous ne vous réauthentifiez que si Home Assistant est resté éteint plus de ~24 h (au-delà desquelles le jeton ne peut plus être renouvelé).
+Le jeton d'actualisation est renouvelé à chaque interrogation et conservé ; lorsqu'il expire, l'intégration se reconnecte automatiquement. Aucune ré-authentification périodique n'est nécessaire. Si vous changez votre mot de passe Sogedo ou si Sogedo modifie sa page de connexion, Home Assistant vous demande de vous reconnecter.

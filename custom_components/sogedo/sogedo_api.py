@@ -1,9 +1,11 @@
 """Sogedo authentication and API client.
 
 Sogedo's customer portal uses Azure AD B2C. Device-code and ROPC flows are
-disabled, so the config flow performs an interactive authorization-code flow
-with PKCE; the resulting refresh token is stored in the config entry and used
-to mint short-lived access tokens (valid 1h) for API calls.
+disabled, so we drive the portal's own sign-in page: post the email/password
+to the B2C SelfAsserted endpoint, then follow the confirmation redirect to get
+an authorization code. The refresh token is used to mint short-lived access
+tokens (valid 1h); when it expires, the client signs in again with the stored
+credentials.
 """
 
 from __future__ import annotations
@@ -13,6 +15,7 @@ import hashlib
 import json
 import logging
 import os
+import re
 import time
 from typing import Any
 from urllib.parse import parse_qs, urlencode, urlparse
@@ -35,38 +38,13 @@ API_BASE = "https://mon-compte.sogedo.fr/api"
 
 TOKEN_ENDPOINT = f"{AUTHORITY}/oauth2/v2.0/token"
 AUTHORIZE_ENDPOINT = f"{AUTHORITY}/oauth2/v2.0/authorize"
+SELF_ASSERTED_ENDPOINT = f"{AUTHORITY}/SelfAsserted"
+CONFIRM_ENDPOINT = f"{AUTHORITY}/api/CombinedSigninAndSignup/confirmed"
+POLICY = "B2C_1A_signup_signin"
 
 
 class SogedoAuthError(Exception):
     """Raised when authentication fails."""
-
-
-def _parse_pasted(value: str) -> dict[str, list[str]]:
-    """Parse a pasted redirect URL or query fragment into its parameters."""
-    value = (value or "").strip()
-    if value.startswith("http"):
-        return parse_qs(urlparse(value).query)
-    if "code=" in value or "state=" in value or "&" in value:
-        return parse_qs(value)
-    return {}
-
-
-def extract_code(value: str) -> str | None:
-    """Return the authorization code from a pasted URL, fragment or raw code."""
-    value = (value or "").strip()
-    if not value:
-        return None
-    params = _parse_pasted(value)
-    if params:
-        codes = params.get("code")
-        return codes[0] if codes else None
-    return value
-
-
-def extract_state(value: str) -> str | None:
-    """Return the `state` from a pasted URL/fragment, if present."""
-    states = _parse_pasted(value).get("state")
-    return states[0] if states else None
 
 
 def generate_pkce() -> tuple[str, str]:
@@ -93,7 +71,9 @@ def build_authorize_url(code_challenge: str, state: str) -> str:
     return f"{AUTHORIZE_ENDPOINT}?{urlencode(params)}"
 
 
-def exchange_code(code: str, code_verifier: str) -> dict[str, Any]:
+def exchange_code(
+    code: str, code_verifier: str, session: requests.Session | None = None
+) -> dict[str, Any]:
     """Exchange an authorization code for tokens. Returns the token dict."""
     data = {
         "grant_type": "authorization_code",
@@ -103,7 +83,7 @@ def exchange_code(code: str, code_verifier: str) -> dict[str, Any]:
         "code_verifier": code_verifier,
         "scope": SCOPE,
     }
-    resp = requests.post(
+    resp = (session or requests).post(
         TOKEN_ENDPOINT,
         data=data,
         headers={"Content-Type": "application/x-www-form-urlencoded"},
@@ -115,10 +95,81 @@ def exchange_code(code: str, code_verifier: str) -> dict[str, Any]:
     return body
 
 
+def parse_login_settings(html: str) -> tuple[str, str]:
+    """Return (csrf, transaction id) from the B2C sign-in page.
+
+    SETTINGS is a JS object literal (it contains functions), so a JSON parser
+    cannot read it; the two values we need are plain quoted strings.
+    """
+    csrf = re.search(r'"csrf":"([^"]+)"', html)
+    tx = re.search(r'"transId":"([^"]+)"', html)
+    if not csrf or not tx:
+        raise SogedoAuthError("Sogedo login page format changed")
+    return csrf.group(1), tx.group(1)
+
+
+def login(
+    email: str, password: str, session: requests.Session | None = None
+) -> dict[str, Any]:
+    """Sign in with email/password and return the token response."""
+    session = session or requests.Session()
+    verifier, challenge = generate_pkce()
+    page = session.get(
+        build_authorize_url(challenge, "sogedo-" + challenge[:8]), timeout=30
+    )
+    page.raise_for_status()
+    csrf, tx = parse_login_settings(page.text)
+
+    headers = {
+        "X-CSRF-TOKEN": csrf,
+        "X-Requested-With": "XMLHttpRequest",
+        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+        "Accept": "application/json, text/javascript, */*; q=0.01",
+        "Origin": "https://mon-compte.sogedo.fr",
+        "Referer": page.url,
+    }
+    resp = session.post(
+        SELF_ASSERTED_ENDPOINT,
+        params={"tx": tx, "p": POLICY},
+        data={"request": tx, "signInName": email, "password": password},
+        headers=headers,
+        timeout=30,
+    )
+    # A failed sign-in returns two concatenated JSON objects, so a strict JSON
+    # parse is unsafe; the status and message are still greppable.
+    if '"status":"200"' not in resp.text:
+        message = re.search(r'"message":"([^"]*)"', resp.text)
+        raise SogedoAuthError(
+            message.group(1) if message else "Invalid email or password"
+        )
+
+    confirmed = session.post(
+        CONFIRM_ENDPOINT,
+        params={"rememberMe": "false", "csrf_token": csrf, "tx": tx, "p": POLICY},
+        headers=headers,
+        allow_redirects=False,
+        timeout=30,
+    )
+    query = parse_qs(urlparse(confirmed.headers.get("location", "")).query)
+    code = (query.get("code") or [None])[0]
+    if not code:
+        detail = (query.get("error_description") or ["no code in redirect"])[0]
+        raise SogedoAuthError(f"Sogedo sign-in failed: {detail}")
+    return exchange_code(code, verifier, session)
+
+
 class SogedoClient:
     """Thin client over the Sogedo API with refresh-token auth."""
 
-    def __init__(self, refresh_token: str, session: requests.Session | None = None) -> None:
+    def __init__(
+        self,
+        email: str,
+        password: str,
+        refresh_token: str | None = None,
+        session: requests.Session | None = None,
+    ) -> None:
+        self._email = email
+        self._password = password
         self._refresh_token = refresh_token
         self._access_token: str | None = None
         self._access_expires_at = 0.0
@@ -129,6 +180,13 @@ class SogedoClient:
     def _ensure_access_token(self) -> str:
         if self._access_token and time.time() < self._access_expires_at - 60:
             return self._access_token
+        if self._refresh_token and self._refresh():
+            return self._access_token
+        self._sign_in()
+        return self._access_token
+
+    def _refresh(self) -> bool:
+        """Try the refresh grant; return False when the token has lapsed."""
         data = {
             "grant_type": "refresh_token",
             "client_id": CLIENT_ID,
@@ -143,17 +201,22 @@ class SogedoClient:
         )
         body = resp.json()
         if "access_token" not in body:
-            raise SogedoAuthError(
-                f"Token refresh failed: {body.get('error_description', body)}"
-            )
+            _LOGGER.debug("Sogedo refresh token rejected; signing in again")
+            return False
+        self._store_tokens(body)
+        return True
+
+    def _sign_in(self) -> None:
+        self._store_tokens(login(self._email, self._password, self._session))
+
+    def _store_tokens(self, body: dict[str, Any]) -> None:
         self._access_token = body["access_token"]
         self._access_expires_at = time.time() + int(body.get("expires_in", 3600))
         if body.get("refresh_token"):
             self._refresh_token = body["refresh_token"]
-        return self._access_token
 
     @property
-    def refresh_token(self) -> str:
+    def refresh_token(self) -> str | None:
         return self._refresh_token
 
     # -- API calls ----------------------------------------------------------
