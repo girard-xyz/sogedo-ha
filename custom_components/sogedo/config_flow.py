@@ -38,7 +38,9 @@ def _credentials_schema() -> vol.Schema:
     return vol.Schema(
         {
             vol.Required(CONF_EMAIL): str,
-            vol.Required(CONF_PASSWORD): TextSelector(TextSelectorType.PASSWORD),
+            vol.Required(CONF_PASSWORD): TextSelector(
+                {"type": TextSelectorType.PASSWORD}
+            ),
         }
     )
 

@@ -13,10 +13,6 @@ BASE = Path(__file__).resolve().parents[1] / "custom_components" / "sogedo"
 
 def _load_with_const(modname, filename, pkg_name):
     """Load a package submodule, stubbing its `const` relative import."""
-    cc = types.ModuleType("custom_components")
-    cc.__path__ = []
-    sys.modules.setdefault("custom_components", cc)
-
     pkg = types.ModuleType(pkg_name)
     pkg.__path__ = []
     pkg.__package__ = pkg_name
