@@ -22,6 +22,10 @@ _LOGGER = logging.getLogger(__name__)
 HISTORY_STATISTIC_ID = "sensor.sogedo_water_consumption"
 COST_STATISTIC_ID = "sensor.sogedo_water_cost"
 
+# Re-check this many trailing days on every poll: Sogedo publishes late (J-1
+# or later), so a day written as a placeholder must be corrected.
+HISTORY_REFRESH_DAYS = 7
+
 
 class SogedoCoordinator(DataUpdateCoordinator[dict]):
     """Fetch and expose Sogedo daily consumption."""
@@ -46,8 +50,7 @@ class SogedoCoordinator(DataUpdateCoordinator[dict]):
         self._persist_token = persist_token
         self._last_token = client.refresh_token
         self._backfilled = False
-        self._history_sum = 0.0
-        self._history_cost_sum = 0.0
+        self._days: dict[datetime.date, float] = {}
         self._history_last: datetime.date | None = None
 
     async def _async_update_data(self) -> dict:
@@ -81,8 +84,8 @@ class SogedoCoordinator(DataUpdateCoordinator[dict]):
         }
 
         if not self._backfilled:
-            await self._backfill()
-            self._backfilled = True
+            # Retry on the next poll if the backfill failed.
+            self._backfilled = await self._backfill()
         else:
             await self._append_recent(today)
 
@@ -141,9 +144,7 @@ class SogedoCoordinator(DataUpdateCoordinator[dict]):
 
     @staticmethod
     def _collect_days(
-        entries: list[dict],
-        today: datetime.date,
-        min_date: datetime.date | None = None,
+        entries: list[dict], today: datetime.date
     ) -> list[tuple[datetime.date, float]]:
         days: list[tuple[datetime.date, float]] = []
         for e in entries:
@@ -155,7 +156,9 @@ class SogedoCoordinator(DataUpdateCoordinator[dict]):
                 continue
             if d >= today:
                 continue
-            if min_date is not None and d <= min_date:
+            # Not yet published: Sogedo sends a 0 placeholder, not a real
+            # reading. Writing it would freeze the day at zero.
+            if not e.get("isIndexValueAvailable"):
                 continue
             if e.get("consumptionValue") is None:
                 continue
@@ -166,7 +169,7 @@ class SogedoCoordinator(DataUpdateCoordinator[dict]):
     @staticmethod
     def _build_series(
         days: list[tuple[datetime.date, float]], price: float | None
-    ) -> tuple[list[dict], list[dict], float, float]:
+    ) -> tuple[list[dict], list[dict]]:
         """Build cumulative consumption (and cost) statistics from daily values."""
         cons_stats: list[dict] = []
         cost_stats: list[dict] = []
@@ -190,18 +193,17 @@ class SogedoCoordinator(DataUpdateCoordinator[dict]):
                         "sum": cost_total,
                     }
                 )
-        return cons_stats, cost_stats, cons_total, cost_total
+        return cons_stats, cost_stats
 
-    async def _backfill(self) -> None:
-        """Best-effort backfill of the full history into the recorder.
+    async def _backfill(self) -> bool:
+        """Backfill the full history, replacing daily placeholders.
 
         Writes running cumulatives of the daily consumption (and cost) as
         `sum`/`state` so the Energy Dashboard's `change` (sum deltas) equals
         each day's consumption / cost. Idempotent: re-running overwrites the
-        same rows.
+        same rows. Returns False when the fetch failed, so it is retried.
         """
         try:
-            price = await self._get_price()
             today = dt_util.utcnow().date()
             end_date = today - timedelta(days=1)
             start = end_date - timedelta(days=BACKFILL_DAYS)
@@ -209,23 +211,15 @@ class SogedoCoordinator(DataUpdateCoordinator[dict]):
             entries = await self._fetch_range(start, end_date)
             days = self._collect_days(entries, today)
             if not days:
-                return
+                return True
 
-            cons_stats, cost_stats, cons_total, cost_total = self._build_series(
-                days, price
-            )
-
-            self._write_statistics(cons_stats, HISTORY_STATISTIC_ID, "volume", "m³")
-            if cost_stats:
-                self._write_statistics(cost_stats, COST_STATISTIC_ID, None, "EUR")
-                await self._ensure_cost_stat()
-
-            self._history_sum = cons_total
-            self._history_cost_sum = cost_total
-            self._history_last = days[-1][0]
-            _LOGGER.info("Sogedo backfilled %s days of water history", len(days))
+            self._days = dict(days)
+            count = await self._rewrite_tail(days[0][0])
+            _LOGGER.info("Sogedo backfilled %s days of water history", count)
+            return True
         except Exception:  # noqa: BLE001
-            _LOGGER.warning("Sogedo backfill failed; skipping", exc_info=True)
+            _LOGGER.warning("Sogedo backfill failed; retrying next poll", exc_info=True)
+            return False
 
     async def _ensure_cost_stat(self) -> None:
         """Point the Energy Dashboard water source's Coût at the cost statistic."""
@@ -291,43 +285,60 @@ class SogedoCoordinator(DataUpdateCoordinator[dict]):
         except Exception:  # noqa: BLE001
             _LOGGER.debug("Could not clean stray statistics", exc_info=True)
 
+    def _merge_days(self, entries: list[dict], today: datetime.date) -> bool:
+        """Record published daily values; return True if any day changed."""
+        changed = False
+        for d, value in self._collect_days(entries, today):
+            if self._days.get(d) != value:
+                self._days[d] = value
+                changed = True
+        return changed
+
     async def _append_recent(self, today: datetime.date) -> None:
-        """Extend the history statistics with any new days since the last run."""
+        """Re-check recent days so late-published values replace placeholders."""
         try:
-            if self._history_last is None:
-                return
-            start = self._history_last
             end = today - timedelta(days=1)
-            if start >= end:
+            start = (self._history_last or end) - timedelta(days=HISTORY_REFRESH_DAYS)
+            if start > end:
                 return
 
             entries = await self._fetch_range(start, end)
-            days = self._collect_days(entries, today, min_date=self._history_last)
-            if not days:
+            if not self._merge_days(entries, today):
+                return
+            if self._history_last is None:
+                # No known total to anchor the running sums: redo the full
+                # backfill instead of writing a tail that starts at 0.
+                await self._backfill()
                 return
 
-            price = await self._get_price()
-            cons_stats, cost_stats, cons_added, cost_added = self._build_series(
-                days, price
-            )
-            # The series builders start from 0; offset them by the stored totals.
-            for stat in cons_stats:
-                stat["state"] += self._history_sum
-                stat["sum"] += self._history_sum
-            for stat in cost_stats:
-                stat["state"] += self._history_cost_sum
-                stat["sum"] += self._history_cost_sum
-
-            self._write_statistics(cons_stats, HISTORY_STATISTIC_ID, "volume", "m³")
-            if cost_stats:
-                self._write_statistics(cost_stats, COST_STATISTIC_ID, None, "EUR")
-
-            self._history_sum += cons_added
-            self._history_cost_sum += cost_added
-            self._history_last = days[-1][0]
-            _LOGGER.info("Sogedo appended %s days of water history", len(days))
+            count = await self._rewrite_tail(start)
+            _LOGGER.info("Sogedo updated %s days of water history", count)
         except Exception:  # noqa: BLE001
-            _LOGGER.warning("Sogedo history append failed; skipping", exc_info=True)
+            _LOGGER.warning("Sogedo history update failed; skipping", exc_info=True)
+
+    async def _rewrite_tail(self, first_day: datetime.date) -> int:
+        """Rewrite statistics from `first_day` on with correct running sums."""
+        days = sorted((d, v) for d, v in self._days.items() if d >= first_day)
+        if not days:
+            return 0
+
+        base = sum(v for d, v in self._days.items() if d < first_day)
+        price = await self._get_price()
+        cons_stats, cost_stats = self._build_series(days, price)
+        for stat in cons_stats:
+            stat["state"] += base
+            stat["sum"] += base
+        for stat in cost_stats:
+            stat["state"] += base * price
+            stat["sum"] += base * price
+
+        self._write_statistics(cons_stats, HISTORY_STATISTIC_ID, "volume", "m³")
+        if cost_stats:
+            self._write_statistics(cost_stats, COST_STATISTIC_ID, None, "EUR")
+            await self._ensure_cost_stat()
+
+        self._history_last = days[-1][0]
+        return len(days)
 
     def _write_statistics(
         self,

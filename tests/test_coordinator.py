@@ -1,12 +1,19 @@
 """Tests for the Sogedo API helper logic."""
 
+import datetime as dt
 import importlib.util
 import json
 import sys
 import types
 from pathlib import Path
+from unittest.mock import AsyncMock
 
 import pytest
+
+from custom_components.sogedo.coordinator import (
+    HISTORY_STATISTIC_ID,
+    SogedoCoordinator,
+)
 
 BASE = Path(__file__).resolve().parents[1] / "custom_components" / "sogedo"
 
@@ -142,3 +149,66 @@ def test_client_signs_in_when_refresh_token_lapsed():
     client = SogedoClient("user@example.com", "secret", "STALE", session)
     assert client._ensure_access_token() == "ACCESS"
     assert client.refresh_token == "REFRESH"
+
+
+def _coordinator(days, last):
+    coord = SogedoCoordinator.__new__(SogedoCoordinator)
+    coord._days = dict(days)
+    coord._history_last = last
+    coord._get_price = AsyncMock(return_value=None)
+    written: dict[str, list[dict]] = {}
+    coord._write_statistics = lambda stats, sid, uc, um: written.setdefault(
+        sid, []
+    ).extend(stats)
+    return coord, written
+
+
+def test_collect_days_skips_unpublished_placeholders():
+    entries = [
+        {
+            "indexDate": "2026-10-30T00:00:00",
+            "consumptionValue": 0.209,
+            "isIndexValueAvailable": True,
+        },
+        {
+            "indexDate": "2026-10-31T00:00:00",
+            "consumptionValue": 0.0,
+            "isIndexValueAvailable": False,
+        },
+    ]
+    assert SogedoCoordinator._collect_days(entries, dt.date(2026, 11, 2)) == [
+        (dt.date(2026, 10, 30), 0.209)
+    ]
+
+
+def test_merge_days_detects_late_value():
+    coord, _ = _coordinator({dt.date(2026, 10, 30): 0.209}, dt.date(2026, 10, 30))
+    entries = [
+        {
+            "indexDate": "2026-10-31T00:00:00",
+            "consumptionValue": 0.356,
+            "isIndexValueAvailable": True,
+        }
+    ]
+    assert coord._merge_days(entries, dt.date(2026, 11, 2)) is True
+    assert coord._days[dt.date(2026, 10, 31)] == 0.356
+    assert coord._merge_days(entries, dt.date(2026, 11, 2)) is False
+
+
+async def test_rewrite_tail_recomputes_running_sums():
+    days = {
+        dt.date(2026, 10, 30): 0.209,
+        dt.date(2026, 10, 31): 0.356,
+        dt.date(2026, 11, 1): 0.298,
+    }
+    coord, written = _coordinator(days, dt.date(2026, 10, 30))
+
+    await coord._rewrite_tail(dt.date(2026, 10, 31))
+
+    stats = written[HISTORY_STATISTIC_ID]
+    assert [s["start"].date() for s in stats] == [
+        dt.date(2026, 10, 31),
+        dt.date(2026, 11, 1),
+    ]
+    assert [s["sum"] for s in stats] == pytest.approx([0.565, 0.863])
+    assert coord._history_last == dt.date(2026, 11, 1)
