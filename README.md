@@ -1,132 +1,160 @@
 # Sogedo Water for Home Assistant
 
-Reads your daily water consumption from [mon-compte.sogedo.fr](https://mon-compte.sogedo.fr) and feeds it into the Home Assistant Energy Dashboard.
+[![HACS Custom](https://img.shields.io/badge/HACS-Custom-41BDF5.svg?style=for-the-badge)](https://hacs.xyz)
+[![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2024.4%2B-41BDF5.svg?style=for-the-badge&logo=homeassistant&logoColor=white)](https://www.home-assistant.io)
+[![Version](https://img.shields.io/badge/version-0.1.3-blue.svg?style=for-the-badge)](https://github.com/girard-xyz/sogedo-ha/releases)
+[![License](https://img.shields.io/badge/license-MIT-green.svg?style=for-the-badge)](LICENSE)
 
-[![Open your Home Assistant instance and show the HACS repository.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=girard-xyz&repository=sogedo-ha&category=integration)
-[![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg?style=for-the-badge)](https://github.com/hacs/integration)
+**English** | [Français](README.fr.md)
 
----
+An unofficial Home Assistant integration for [Sogedo](https://mon-compte.sogedo.fr) water meters. It pulls your daily consumption and meter index, backfills your full history, and feeds it into the **Energy Dashboard** — water and cost.
 
-## English / Anglais
+![Sogedo water consumption in the Home Assistant Energy Dashboard](docs/energy-dashboard.png)
 
-### Features
+[![Open your Home Assistant instance and open this repository in HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=girard-xyz&repository=sogedo-ha&category=integration)
 
-- **Daily consumption** sensor (`sensor.sogedo_water_daily`) — water used on the last completed day (J-1), in m³.
-- **Cumulative consumption** sensor (`sensor.sogedo_water_cumulative`) — current total meter index, `total_increasing`.
-- **Water history** (`sensor.sogedo_water_consumption`) — a statistics-only history series backfilled with your full consumption history. This is the Energy Dashboard **mains water** source.
-- **Water cost history** (`sensor.sogedo_water_cost`) — a statistics-only cost series (consumption × your Energy Dashboard water price, read automatically at backfill time). Set it as the water source **Coût** (`stat_cost`).
-- **Refresh history** button (`button.sogedo_actualiser_l_historique`) — re-runs the backfill on demand (idempotent, safe to press any time).
-- Backfills your full water history on first setup (best-effort; a failure never breaks the integration).
-- Updates every 6 hours (Sogedo publishes data daily).
-- Signs in again automatically when the session expires (email/password stored once).
+## Table of contents
 
-### Requirements
+- [Why](#why)
+- [Features](#features)
+- [Requirements](#requirements)
+- [Installation](#installation)
+- [Setup](#setup)
+- [Entities](#entities)
+- [Energy Dashboard](#energy-dashboard)
+- [How it works](#how-it-works)
+- [Troubleshooting](#troubleshooting)
+- [Data & privacy](#data--privacy)
+- [Contributing](#contributing)
+- [Disclaimer](#disclaimer)
+- [License](#license)
 
-- Home Assistant with [HACS](https://hacs.xyz)
-- A Sogedo online-account login
+## Why
 
-### Installation
+The Sogedo customer portal only shows water consumption as a table. Home Assistant's Energy Dashboard needs **long-term statistics**, not a table.
 
-1. **HACS** → ⋯ (Custom repositories) → add `https://github.com/girard-xyz/sogedo-ha` → category **Integration** → install. (Or use the **Add repository** button at the top of this page.)
-2. **Restart Home Assistant.**
-3. **Settings → Devices & Services → Add Integration → Sogedo Water.**
-4. **Sign in:** enter your Sogedo account email and password in the dialog.
+This integration signs in to your account, converts the portal data into proper sensors and statistics, and keeps them up to date — so water usage appears next to electricity and gas, with history and cost.
 
-### Entities
+## Features
 
-| Entity | Purpose |
+- **Daily consumption** — water used on the last completed day (J-1), in m³.
+- **Cumulative index** — current meter reading, `total_increasing`.
+- **Full history** — 10 years of daily consumption backfilled as long-term statistics, ready for the Energy Dashboard.
+- **Cost history** — consumption × the water price configured in the Energy Dashboard.
+- **Automatic sign-in** — email and password are stored once; when the refresh token expires, the integration signs in again silently.
+- **Late data handled** — Sogedo publishes with a delay, so the last 7 days are re-checked on every poll and placeholders are corrected.
+- **Refresh history button** — re-run the backfill on demand (idempotent, safe to press any time).
+- **Polls every 6 hours** — Sogedo only publishes daily data, there is nothing to gain from polling faster.
+
+## Requirements
+
+- Home Assistant **2024.4** or newer.
+- A Sogedo online account (email + password).
+- [HACS](https://hacs.xyz) for the recommended installation.
+
+## Installation
+
+### HACS (recommended)
+
+1. Open **HACS → Integrations → ⋯ → Custom repositories**.
+2. Add `https://github.com/girard-xyz/sogedo-ha` with category **Integration**.
+3. Install **Sogedo Water**.
+4. Restart Home Assistant.
+
+You can also use the **Add repository** button above.
+
+### Manual
+
+Copy `custom_components/sogedo` into your Home Assistant configuration directory:
+
+```
+config/
+└── custom_components/
+    └── sogedo/
+```
+
+Then restart Home Assistant.
+
+## Setup
+
+1. Go to **Settings → Devices & services → Add integration**.
+2. Search for **Sogedo Water**.
+3. Enter the email and password of your Sogedo online account.
+4. If your account has several subscriptions, pick the one to monitor.
+
+Your credentials are stored in the Home Assistant config entry and used to open a session with Sogedo. You only have to sign in again if you change your Sogedo password or if Sogedo changes its login page.
+
+## Entities
+
+Entity IDs are localized to your Home Assistant language. The examples below use English (French in `README.fr.md`).
+
+| Entity | Description |
 |---|---|
-| `sensor.sogedo_water_daily` | water used on the last completed day (J-1), m³ |
-| `sensor.sogedo_water_cumulative` | current meter index (`total_increasing`) |
-| `sensor.sogedo_water_consumption` | history series (statistics-only) — **Energy Dashboard water source** |
-| `sensor.sogedo_water_cost` | cost history series (statistics-only) — **Energy Dashboard Coût source** |
-| `button.sogedo_actualiser_l_historique` | re-run the backfill |
+| `sensor.daily_consumption` | Water used on the last completed day (J-1), m³ |
+| `sensor.cumulative_consumption` | Current meter index, `total_increasing` |
+| `sensor.sogedo_water_consumption` | Long-term statistic (no live entity) — **Energy Dashboard water source** |
+| `sensor.sogedo_water_cost` | Long-term statistic (no live entity) — **Energy Dashboard cost source** |
+| `button.refresh_history` | Re-run the history backfill |
+| `update.sogedo_water_update` | Update notifications from HACS/Home Assistant |
 
-> Note: sensor entity IDs are localized to your Home Assistant language (e.g. French → `sensor.consommation_journaliere`, `sensor.consommation_cumulee`). The two history statistics (`sensor.sogedo_water_consumption`, `sensor.sogedo_water_cost`) are fixed.
+> The two statistics (`sensor.sogedo_water_consumption` and `sensor.sogedo_water_cost`) have fixed IDs and do not change with the language.
 
-### Energy Dashboard setup
+## Energy Dashboard
 
-1. **Settings → Energy → Water sources → Add** (or edit the existing one).
+1. Go to **Settings → Dashboards → Energy → Water sources → Add** (or edit the existing one).
 2. **Mains water** → select `sensor.sogedo_water_consumption`.
-3. Set the **price** (€/m³) for the source.
+3. Enter the water **price** (€/m³).
 
-The **Coût** statistic is set automatically to `sensor.sogedo_water_cost` by the integration the first time the backfill runs.
+The integration sets the **cost** statistic (`sensor.sogedo_water_cost`) automatically the first time the backfill runs. The history graph and cost breakdown then show every day, including the backfilled years.
 
-The backfill writes running cumulatives of the daily consumption and cost, so every day shows its real consumption and cost — including backfilled history. The water price is read from your Energy Dashboard water source config at backfill time. After changing the price, press the **Actualiser l'historique** button to recompute the cost history.
+If you change the price, press **Refresh history** to recompute the cost series.
 
-> The water **graph** card shows consumption only; the **cost** appears in the cost breakdown / flow.
+## How it works
 
-### Troubleshooting
+- **Authentication** — Sogedo uses Azure AD B2C with the password flow disabled, so the integration drives the portal's own sign-in page, obtains an authorization code, and exchanges it for tokens. The refresh token is persisted; when it lapses, the stored credentials are used to sign in again.
+- **Polling** — every 6 hours. Sogedo publishes data for the previous day, sometimes later.
+- **Statistics** — the integration writes running cumulatives to the recorder, so the Energy Dashboard's daily *change* equals the real daily consumption (and cost).
+- **Backfill** — on first setup, and on demand via the button, the full 10-year history is fetched in one-year chunks and written idempotently.
+- **Late data** — each poll re-fetches the last 7 days and rewrites that tail, so days published late are corrected instead of being frozen at zero.
 
-- **"Sogedo backfill failed; skipping"** in the logs → open the log entry for the full traceback (usually a transient API/network issue; press the button to retry).
-- **Login rejected** → the entry shows *Reconfigurer* / *Connexion requise*: re-enter your email and password in place — entities and dashboard settings are preserved.
-- **No new data** → check the sensor's last update; Sogedo publishes the previous day (J-1).
+## Troubleshooting
 
-### Notes
+**The Energy Dashboard shows no water use for recent days.**
+Sogedo publishes J-1 at the earliest, sometimes with several days of delay. The sensors keep the last published value; press **Refresh history** to force a re-check once the portal has the data.
 
-Sogedo uses Azure AD B2C: the integration signs in through the portal's own login page, so your email and password are stored in Home Assistant's config entry (plain text, like most Home Assistant integrations) and are used to sign in again when the session expires.
+**"Sogedo backfill failed; retrying next poll" in the log.**
+Usually a transient network/API error. The integration retries automatically; the **Refresh history** button forces it immediately.
 
-The refresh token is renewed on every poll and persisted; when it lapses, the integration signs in again automatically. No periodic re-authentication is needed. If you change your Sogedo password or Sogedo changes its login page, Home Assistant asks you to sign in again.
+**Home Assistant asks to re-authenticate.**
+The password changed, or Sogedo changed its login page. Enter the email and password again — entities, history and dashboard settings are preserved.
 
----
+**No data at all / wrong account.**
+Remove the integration and add it again. History is preserved and the backfill is idempotent.
 
-## Français / French
+## Data & privacy
 
-### Fonctionnalités
+- The integration talks only to `mon-compte.sogedo.fr` and `login.mon-compte.sogedo.fr`.
+- Your email and password are stored in Home Assistant's config entry (`.storage/core.config_entries`, like most Home Assistant integrations). The password is never sent anywhere except Sogedo's login page.
+- No telemetry, no third-party server.
+- This is an unofficial client: Sogedo can change its portal at any time, and the integration may need an update when it does.
 
-- **Consommation journalière** (`sensor.consommation_journaliere`) — eau consommée le dernier jour complet (J-1), en m³.
-- **Consommation cumulée** (`sensor.consommation_cumulee`) — index actuel du compteur, `total_increasing`.
-- **Historique de consommation** (`sensor.sogedo_water_consumption`) — série d'historique (statistiques uniquement), rétro-remplie avec toute votre consommation. C'est la source **Eau du réseau** du tableau de bord Énergie.
-- **Historique de coût** (`sensor.sogedo_water_cost`) — série de coût (consommation × prix configuré dans Énergie, lu automatiquement). À renseigner comme statistique **Coût** (`stat_cost`).
-- **Actualiser l'historique** (`button.actualiser_l_historique`) — relance le rétro-remplissage à la demande (idempotent, sans risque).
-- Rétro-remplit tout l'historique au premier démarrage (non bloquant en cas d'échec).
-- Mise à jour toutes les 6 heures (Sogedo publie les données quotidiennement).
-- Reconnexion automatique quand la session expire (e-mail / mot de passe enregistrés une fois).
+## Contributing
 
-### Prérequis
+Issues and pull requests are welcome.
 
-- Home Assistant avec [HACS](https://hacs.xyz)
-- Un compte Sogedo en ligne
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements_test.txt
+pytest
+```
 
-### Installation
+The test suite runs against a real Home Assistant (`pytest-homeassistant-custom-component`), including the config flow and the history-statistics logic.
 
-1. **HACS** → ⋯ (Dépôts personnalisés) → ajouter `https://github.com/girard-xyz/sogedo-ha` → catégorie **Intégration** → installer. (Ou utiliser le bouton **Add repository** en haut de cette page.)
-2. **Redémarrer Home Assistant.**
-3. **Paramètres → Périphériques et services → Ajouter une intégration → Sogedo Water.**
-4. **Connexion :** saisissez l'e-mail et le mot de passe de votre compte Sogedo dans la fenêtre.
+## Disclaimer
 
-### Entités
+This project is not affiliated with, endorsed by, or supported by Sogedo. *Sogedo* and its portal belong to their respective owners. Use it at your own risk.
 
-| Entité | Rôle |
-|---|---|
-| `sensor.consommation_journaliere` | eau consommée le dernier jour complet (J-1), m³ |
-| `sensor.consommation_cumulee` | index actuel du compteur (`total_increasing`) |
-| `sensor.sogedo_water_consumption` | historique (statistiques) — **source Eau du tableau de bord Énergie** |
-| `sensor.sogedo_water_cost` | historique de coût (statistiques) — **source Coût du tableau de bord Énergie** |
-| `button.actualiser_l_historique` | relance le rétro-remplissage |
+## License
 
-> Remarque : les identifiants des capteurs sont localisés selon la langue de Home Assistant (ex. anglais → `sensor.sogedo_water_daily`). Les deux statistiques d'historique (`sensor.sogedo_water_consumption`, `sensor.sogedo_water_cost`) sont fixes.
-
-### Configuration du tableau de bord Énergie
-
-1. **Paramètres → Énergie → Sources d'eau → Ajouter** (ou modifier).
-2. **Eau du réseau** → sélectionner `sensor.sogedo_water_consumption`.
-3. Renseigner le **prix** (€/m³) de la source.
-
-La statistique **Coût** est renseignée automatiquement sur `sensor.sogedo_water_cost` par l'intégration au premier rétro-remplissage.
-
-Le rétro-remplissage écrit des cumuls de consommation et de coût, si bien que chaque jour affiche sa consommation et son coût réels — y compris l'historique. Le prix est lu depuis votre configuration Énergie au moment du rétro-remplissage. Après un changement de prix, appuyez sur **Actualiser l'historique** pour recalculer le coût.
-
-> Le graphique **eau** n'affiche que la consommation ; le **coût** apparaît dans le détail des coûts / le flux.
-
-### Dépannage
-
-- **« Sogedo backfill failed; skipping »** dans les journaux → ouvrir l'entrée pour la trace complète (souvent un problème API/réseau passager ; relancer via le bouton).
-- **Connexion refusée** → l'entrée affiche *Reconfigurer* / *Connexion requise* : resaisissez votre e-mail et votre mot de passe sur place — les entités et les réglages Énergie sont conservés.
-- **Pas de nouvelles données** → vérifier la dernière mise à jour du capteur ; Sogedo publie la veille (J-1).
-
-### Notes
-
-Sogedo utilise Azure AD B2C : l'intégration se connecte via la page de connexion du portail, donc votre e-mail et votre mot de passe sont enregistrés dans la configuration de Home Assistant (en clair, comme la plupart des intégrations) et servent à se reconnecter quand la session expire.
-
-Le jeton d'actualisation est renouvelé à chaque interrogation et conservé ; lorsqu'il expire, l'intégration se reconnecte automatiquement. Aucune ré-authentification périodique n'est nécessaire. Si vous changez votre mot de passe Sogedo ou si Sogedo modifie sa page de connexion, Home Assistant vous demande de vous reconnecter.
+[MIT](LICENSE) © girard-xyz
