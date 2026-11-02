@@ -1,8 +1,12 @@
+<p align="center">
+  <img src="custom_components/sogedo/brand/icon.png" width="96" alt="Icône Sogedo Water">
+</p>
+
 # Sogedo Water pour Home Assistant
 
 [![HACS Custom](https://img.shields.io/badge/HACS-Custom-41BDF5.svg?style=for-the-badge)](https://hacs.xyz)
 [![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2024.4%2B-41BDF5.svg?style=for-the-badge&logo=homeassistant&logoColor=white)](https://www.home-assistant.io)
-[![Version](https://img.shields.io/badge/version-0.1.3-blue.svg?style=for-the-badge)](https://github.com/girard-xyz/sogedo-ha/releases)
+[![Version](https://img.shields.io/badge/version-0.1.4-blue.svg?style=for-the-badge)](https://github.com/girard-xyz/sogedo-ha/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg?style=for-the-badge)](LICENSE)
 
 [English](README.md) | **Français**
